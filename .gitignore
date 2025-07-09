@@ -3,3 +3,6 @@
 node_modules
 .next
 .vercel
+CLAUDE.md
+.claude
+.DS_Store
