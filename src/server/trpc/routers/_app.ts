@@ -4,7 +4,7 @@ import { tracked } from "@trpc/server";
 import { createFalClient } from "@fal-ai/client";
 
 const fal = createFalClient({
-  credentials: () => process.env.FAL_KEY as string,
+  credentials: () => process.env.FAL_KEY! as string,
     proxyUrl: "/api/fal",
 });
 
@@ -42,7 +42,6 @@ export const appRouter = router({
   generateImageStream: publicProcedure
     .input(
       z.object({
-        imageUrl: z.string().url(),
         prompt: z.string(),
         loraUrl: z.string().url().optional(),
         seed: z.number().optional(),
@@ -57,9 +56,8 @@ export const appRouter = router({
         const generationId = `gen_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
         // Start streaming from fal.ai
-        const stream = await fal.stream("fal-ai/flux-kontext-lora", {
+        const stream = await fal.stream("fal-ai/flux-kontext-lora/text-to-image", {
           input: {
-            image_url: input.imageUrl,
             prompt: input.prompt,
             num_inference_steps: 30,
             guidance_scale: 2.5,
