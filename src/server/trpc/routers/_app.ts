@@ -70,12 +70,29 @@ async function* createImageStream(
       return;
     }
 
-    // Send the final image
-    yield tracked(`${generationId}_complete`, {
-      type: "complete",
-      imageUrl: images[0].url,
-      seed: result.data?.seed || result.seed,
-    });
+    console.log("result", result);
+
+    // Upload the final image to fal.storage to get a permanent URL
+    try {
+      const imageResponse = await fetch(images[0].url);
+      const imageBlob = await imageResponse.blob();
+      const permanentUrl = await fal.storage.upload(imageBlob);
+
+      // Send the final image with permanent URL
+      yield tracked(`${generationId}_complete`, {
+        type: "complete",
+        imageUrl: permanentUrl,
+        seed: result.data?.seed || result.seed,
+      });
+    } catch (uploadError) {
+      console.error("Error uploading final image to fal.storage:", uploadError);
+      // Fallback to original URL if upload fails
+      yield tracked(`${generationId}_complete`, {
+        type: "complete",
+        imageUrl: images[0].url,
+        seed: result.data?.seed || result.seed,
+      });
+    }
   } catch (error) {
     console.error("Error in image generation stream:", error);
     yield tracked(`error_${Date.now()}`, {

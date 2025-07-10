@@ -10,13 +10,21 @@ export async function POST(req: Request) {
   const result = streamText({
     model: openai('gpt-4.1-mini'),
     messages: convertToModelMessages(messages),
-    system: 'You are a helpful image generation and editing assistant. ONLY IF NECESSARY, ask the user for more info to create the prompt for the image. After calling "generateImage", do not say anything else.',
+    system: 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "startCreateImage" or "startEditImage". Use the user\'s prompt as-is unless it\'s unclear - do NOT improve or modify their prompt. After calling "startCreateImage" or "startEditImage", do not say anything else. When editing image, find the correct image url in the chat history and call "startEditImage" with the right url as image URL input.',
     tools: {
-    generateImage: tool({
+    startCreateImage: tool({
       description:
-        'Generate the image requested by the user.',
+        'Request image generation.',
       inputSchema: z.object({
         prompt: z.string().describe('The prompt for the image'),
+      }),
+    }),
+    startEditImage: tool({
+      description:
+        'Request image editing.',
+      inputSchema: z.object({
+        prompt: z.string().describe('The prompt for the image'),
+        imageUrl: z.string().url().describe('The URL of the image to edit'),
       }),
     }),
   },

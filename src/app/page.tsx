@@ -18,6 +18,8 @@ import { AlertCircle, User, Bot, Image as ImageIcon } from 'lucide-react';
 // Consolidated state type for image generations
 type GenerationState = {
   prompt: string;
+  type: 'create' | 'edit';
+  sourceImageUrl?: string;
   status: 'idle' | 'generating' | 'complete' | 'error';
   streamingImage?: string;
   finalImage?: string;
@@ -36,20 +38,23 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Get the currently active generation
-  const activeGeneration = Object.entries(generations).find(([_, gen]) => gen.status === 'generating');
-  const [activeId, activeState] = activeGeneration || [null, null];
+  // Get the currently active generations
+  const activeCreateGeneration = Object.entries(generations).find(([_, gen]) => gen.type === 'create' && gen.status === 'generating');
+  const [activeCreateId, activeCreateState] = activeCreateGeneration || [null, null];
 
-  // Setup subscription only when there's an active generation
-  const subscription = useSubscription(
+  const activeEditGeneration = Object.entries(generations).find(([_, gen]) => gen.type === 'edit' && gen.status === 'generating');
+  const [activeEditId, activeEditState] = activeEditGeneration || [null, null];
+
+  // Setup create subscription
+  const createSubscription = useSubscription(
     trpc.generateImageStream.subscriptionOptions(
-      activeState ? {
-        prompt: activeState.prompt,
+      activeCreateState ? {
+        prompt: activeCreateState.prompt,
       } : { prompt: "" },
       {
-        enabled: !!activeState,
+        enabled: !!activeCreateState,
         onData: (data: any) => {
-          if (!activeId) return;
+          if (!activeCreateId) return;
 
           const eventData = data.data;
 
@@ -58,27 +63,39 @@ export default function Chat() {
             if (event.images && event.images.length > 0) {
               setGenerations(prev => ({
                 ...prev,
-                [activeId]: {
-                  ...prev[activeId],
+                [activeCreateId]: {
+                  ...prev[activeCreateId],
                   streamingImage: event.images[0].url
                 }
               }));
             }
           } else if (eventData.type === "complete") {
+            console.log("Generate completion event:", eventData);
+            const generation = generations[activeCreateId];
+
             setGenerations(prev => ({
               ...prev,
-              [activeId]: {
-                ...prev[activeId],
+              [activeCreateId]: {
+                ...prev[activeCreateId],
                 status: 'complete',
                 finalImage: eventData.imageUrl,
                 streamingImage: undefined
               }
             }));
+
+            // Add tool result with the final image URL
+            addToolResult({
+              toolCallId: activeCreateId,
+              output: {
+                imageUrl: eventData.imageUrl,
+                prompt: generation?.prompt || ''
+              }
+            });
           } else if (eventData.type === "error") {
             setGenerations(prev => ({
               ...prev,
-              [activeId]: {
-                ...prev[activeId],
+              [activeCreateId]: {
+                ...prev[activeCreateId],
                 status: 'error',
                 error: eventData.error,
                 streamingImage: undefined
@@ -87,11 +104,11 @@ export default function Chat() {
           }
         },
         onError: (error) => {
-          if (!activeId) return;
+          if (!activeCreateId) return;
           setGenerations(prev => ({
             ...prev,
-            [activeId]: {
-              ...prev[activeId],
+            [activeCreateId]: {
+              ...prev[activeCreateId],
               status: 'error',
               error: error.message,
               streamingImage: undefined
@@ -102,10 +119,85 @@ export default function Chat() {
     ),
   );
 
-  const { messages, sendMessage, status } = useChat({
+  // Setup edit subscription
+  const editSubscription = useSubscription(
+    trpc.editImageStream.subscriptionOptions(
+      activeEditState ? {
+        prompt: activeEditState.prompt,
+        imageUrl: activeEditState.sourceImageUrl!,
+      } : { prompt: "", imageUrl: "" },
+      {
+        enabled: !!activeEditState,
+        onData: (data: any) => {
+          if (!activeEditId) return;
+
+          const eventData = data.data;
+
+          if (eventData.type === "progress") {
+            const event = eventData.data;
+            if (event.images && event.images.length > 0) {
+              setGenerations(prev => ({
+                ...prev,
+                [activeEditId]: {
+                  ...prev[activeEditId],
+                  streamingImage: event.images[0].url
+                }
+              }));
+            }
+          } else if (eventData.type === "complete") {
+            const generation = generations[activeEditId];
+
+            setGenerations(prev => ({
+              ...prev,
+              [activeEditId]: {
+                ...prev[activeEditId],
+                status: 'complete',
+                finalImage: eventData.imageUrl,
+                streamingImage: undefined
+              }
+            }));
+
+            // Add tool result with the final edited image URL
+            addToolResult({
+              toolCallId: activeEditId,
+              output: {
+                imageUrl: eventData.imageUrl,
+                prompt: generation?.prompt || '',
+                sourceImageUrl: generation?.sourceImageUrl || ''
+              }
+            });
+          } else if (eventData.type === "error") {
+            setGenerations(prev => ({
+              ...prev,
+              [activeEditId]: {
+                ...prev[activeEditId],
+                status: 'error',
+                error: eventData.error,
+                streamingImage: undefined
+              }
+            }));
+          }
+        },
+        onError: (error) => {
+          if (!activeEditId) return;
+          setGenerations(prev => ({
+            ...prev,
+            [activeEditId]: {
+              ...prev[activeEditId],
+              status: 'error',
+              error: error.message,
+              streamingImage: undefined
+            }
+          }));
+        },
+      },
+    ),
+  );
+
+  const { messages, sendMessage, status, addToolResult } = useChat({
     maxSteps: 5,
     async onToolCall({ toolCall }) {
-      if (toolCall.toolName === 'generateImage') {
+      if (toolCall.toolName === 'startCreateImage') {
         const input = toolCall.input as { prompt: string };
 
         // Initialize generation state
@@ -113,6 +205,22 @@ export default function Chat() {
           ...prev,
           [toolCall.toolCallId]: {
             prompt: input.prompt,
+            type: 'create',
+            status: 'generating'
+          }
+        }));
+
+        return toolCall.input;
+      } else if (toolCall.toolName === 'startEditImage') {
+        const input = toolCall.input as { prompt: string; imageUrl: string };
+
+        // Initialize edit state
+        setGenerations(prev => ({
+          ...prev,
+          [toolCall.toolCallId]: {
+            prompt: input.prompt,
+            type: 'edit',
+            sourceImageUrl: input.imageUrl,
             status: 'generating'
           }
         }));
@@ -132,7 +240,8 @@ export default function Chat() {
     const generation = generations[toolCallId];
     if (!generation) return null;
 
-    const { status, streamingImage, finalImage, error } = generation;
+    const { type, status, streamingImage, finalImage, error, sourceImageUrl } = generation;
+    const isEdit = type === 'edit';
 
     return (
       <Card className="mt-3">
@@ -140,10 +249,15 @@ export default function Chat() {
           <div className="flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
             <CardTitle className="text-sm">
-              {status === 'generating' ? 'Generating image...' :
-                status === 'error' ? 'Generation failed' :
-                  'Generated image'}
+              {status === 'generating' ?
+                (isEdit ? 'Editing image...' : 'Generating image...') :
+                status === 'error' ?
+                  (isEdit ? 'Edit failed' : 'Generation failed') :
+                  (isEdit ? 'Edited image' : 'Generated image')}
             </CardTitle>
+            <Badge variant={isEdit ? 'outline' : 'default'}>
+              {isEdit ? 'Edit' : 'Generate'}
+            </Badge>
             <Badge variant={status === 'generating' ? 'secondary' :
               status === 'error' ? 'destructive' : 'default'}>
               {status === 'generating' ? 'In progress' :
@@ -153,12 +267,24 @@ export default function Chat() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {/* Show loading skeleton during generation without image */}
+          {/* Show source image for edits */}
+          {isEdit && sourceImageUrl && (
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Source image:</p>
+              <img
+                src={sourceImageUrl}
+                alt="Source image"
+                className="w-full h-auto rounded-md border"
+              />
+            </div>
+          )}
+
+          {/* Show loading skeleton during creation without image */}
           {status === 'generating' && !streamingImage && (
             <Skeleton className="w-full h-48 rounded-md" />
           )}
 
-          {/* Show streaming image during generation */}
+          {/* Show streaming image during creation */}
           {status === 'generating' && streamingImage && (
             <div className="relative">
               <img
@@ -173,12 +299,17 @@ export default function Chat() {
           )}
 
           {/* Show final image when complete */}
-          {finalImage && (
-            <img
-              src={finalImage}
-              alt="Generated result"
-              className="w-full h-auto rounded-md border"
-            />
+          {status === 'complete' && finalImage && (
+            <div>
+              {isEdit && (
+                <p className="text-sm text-muted-foreground mb-2">Result:</p>
+              )}
+              <img
+                src={finalImage}
+                alt={isEdit ? "Edited result" : "Created result"}
+                className="w-full h-auto rounded-md border"
+              />
+            </div>
           )}
 
           {/* Show error message */}
@@ -233,7 +364,13 @@ export default function Chat() {
                             {part.text}
                           </div>
                         );
-                      case 'tool-generateImage':
+                      case 'tool-startCreateImage':
+                        return (
+                          <div key={`${message.id}-${i}`}>
+                            {renderImageGeneration(part.toolCallId)}
+                          </div>
+                        );
+                      case 'tool-startEditImage':
                         return (
                           <div key={`${message.id}-${i}`}>
                             {renderImageGeneration(part.toolCallId)}
@@ -268,7 +405,7 @@ export default function Chat() {
               placeholder="Type your message..."
               className="flex-1 bg-background"
             />
-            <Button type="submit" disabled={!input.trim() || status !== 'ready'}>
+            <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!activeCreateId || !!activeEditId}>
               Send
             </Button>
           </div>
