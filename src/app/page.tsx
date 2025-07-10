@@ -1,9 +1,10 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useTRPC } from '@/trpc/client';
 import { useSubscription } from '@trpc/tanstack-react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertCircle, User, Bot, Image as ImageIcon } from 'lucide-react';
+import { AlertCircle, User, Bot, Image as ImageIcon, Upload, X } from 'lucide-react';
 
 // Consolidated state type for image generations
 type GenerationState = {
@@ -31,11 +31,74 @@ export default function Chat() {
   // Single state object for all generations
   const [generations, setGenerations] = useState<Record<string, GenerationState>>({});
 
+  // Upload state management
+  const [uploadState, setUploadState] = useState<{
+    isUploading: boolean;
+    uploadedImage?: string;
+    fileName?: string;
+    previewUrl?: string;
+  }>({ isUploading: false });
+
   const trpc = useTRPC();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Upload mutation
+  const uploadImageMutation = useMutation(trpc.uploadImage.mutationOptions());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // File handling functions
+  const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    try {
+      setUploadState({ isUploading: true });
+
+      // Convert to data URL for preview
+      const previewUrl = await fileToDataURL(file);
+      setUploadState(prev => ({ ...prev, previewUrl, fileName: file.name }));
+
+      // Upload via tRPC
+      const result = await uploadImageMutation.mutateAsync({ image: previewUrl });
+
+      // Store uploaded URL
+      setUploadState({
+        isUploading: false,
+        uploadedImage: result.url,
+        fileName: file.name,
+        previewUrl
+      });
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadState({ isUploading: false });
+      alert('Upload failed. Please try again.');
+    }
+  };
+
+  const handleRemoveUpload = () => {
+    setUploadState({ isUploading: false });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Get the currently active generations
@@ -46,7 +109,7 @@ export default function Chat() {
   const [activeEditId, activeEditState] = activeEditGeneration || [null, null];
 
   // Setup create subscription
-  const createSubscription = useSubscription(
+  useSubscription(
     trpc.generateImageStream.subscriptionOptions(
       activeCreateState ? {
         prompt: activeCreateState.prompt,
@@ -120,7 +183,7 @@ export default function Chat() {
   );
 
   // Setup edit subscription
-  const editSubscription = useSubscription(
+  useSubscription(
     trpc.editImageStream.subscriptionOptions(
       activeEditState ? {
         prompt: activeEditState.prompt,
@@ -236,6 +299,7 @@ export default function Chat() {
 
   console.log(messages);
 
+
   const renderImageGeneration = (toolCallId: string) => {
     const generation = generations[toolCallId];
     if (!generation) return null;
@@ -267,17 +331,6 @@ export default function Chat() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {/* Show source image for edits */}
-          {isEdit && sourceImageUrl && (
-            <div className="mb-4">
-              <p className="text-sm text-muted-foreground mb-2">Source image:</p>
-              <img
-                src={sourceImageUrl}
-                alt="Source image"
-                className="w-full h-auto rounded-md border"
-              />
-            </div>
-          )}
 
           {/* Show loading skeleton during creation without image */}
           {status === 'generating' && !streamingImage && (
@@ -290,7 +343,7 @@ export default function Chat() {
               <img
                 src={streamingImage}
                 alt="Streaming generation"
-                className="w-full h-auto rounded-md border"
+                className="w-full h-auto max-h-96 object-contain rounded-md border"
               />
               <Badge className="absolute top-2 right-2" variant="secondary">
                 Streaming
@@ -301,13 +354,10 @@ export default function Chat() {
           {/* Show final image when complete */}
           {status === 'complete' && finalImage && (
             <div>
-              {isEdit && (
-                <p className="text-sm text-muted-foreground mb-2">Result:</p>
-              )}
               <img
                 src={finalImage}
                 alt={isEdit ? "Edited result" : "Created result"}
-                className="w-full h-auto rounded-md border"
+                className="w-full h-auto max-h-96 object-contain rounded-md border"
               />
             </div>
           )}
@@ -356,9 +406,45 @@ export default function Chat() {
                 </div>
 
                 <div className="space-y-2">
+
                   {message.parts.map((part, i) => {
                     switch (part.type) {
                       case 'text':
+                        // Check if this is a user message with uploaded image
+                        if (message.role === 'user' && part.text.includes('[User has uploaded an image:')) {
+                          const imageUrlMatch = part.text.match(/\[User has uploaded an image: (.*?)\]/);
+                          const imageUrl = imageUrlMatch?.[1];
+                          const remainingText = part.text.replace(/\[User has uploaded an image: .*?\]\s*/, '');
+
+                          return (
+                            <div key={`${message.id}-${i}`} className="space-y-3">
+                              {imageUrl && (
+                                <Card className="mt-3">
+                                  <CardHeader className="pb-3">
+                                    <div className="flex items-center gap-2">
+                                      <ImageIcon className="h-4 w-4" />
+                                      <CardTitle className="text-sm">Uploaded Image</CardTitle>
+                                      <Badge variant="outline">Upload</Badge>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="pt-0">
+                                    <img
+                                      src={imageUrl}
+                                      alt="Uploaded image"
+                                      className="w-full h-auto max-h-96 object-contain rounded-md border"
+                                    />
+                                  </CardContent>
+                                </Card>
+                              )}
+                              {remainingText && (
+                                <div className="prose prose-sm max-w-none">
+                                  {remainingText}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         return (
                           <div key={`${message.id}-${i}`} className="prose prose-sm max-w-none">
                             {part.text}
@@ -388,24 +474,90 @@ export default function Chat() {
         </div>
       </ScrollArea>
 
+      {/* Image preview */}
+      {(uploadState.previewUrl || uploadState.isUploading) && (
+        <div className="border-t bg-muted/30 p-4">
+          <div className="max-w-3xl mx-auto">
+            <Card className="max-w-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  {uploadState.isUploading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      <span className="text-sm">Uploading...</span>
+                    </div>
+                  ) : uploadState.previewUrl ? (
+                    <>
+                      <img
+                        src={uploadState.previewUrl}
+                        alt={uploadState.fileName}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{uploadState.fileName}</p>
+                        <p className="text-xs text-muted-foreground">Ready for editing</p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleRemoveUpload}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* Input form */}
       <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4">
         <form
           onSubmit={e => {
             e.preventDefault();
-            sendMessage({ text: input });
+
+            // Include uploaded image info in message if available
+            let messageText = input;
+            if (uploadState.uploadedImage) {
+              messageText = `[User has uploaded an image: ${uploadState.uploadedImage}] ${input}`;
+            }
+
+            sendMessage({ text: messageText });
             setInput('');
+
+            // Clear upload state after sending any message
+            if (uploadState.uploadedImage || uploadState.previewUrl) {
+              handleRemoveUpload();
+            }
           }}
           className="max-w-3xl mx-auto"
         >
           <div className="flex gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+              ref={fileInputRef}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadState.isUploading || uploadImageMutation.isPending}
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
             <Input
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Type your message..."
               className="flex-1 bg-background"
             />
-            <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!activeCreateId || !!activeEditId}>
+            <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!activeCreateId || !!activeEditId || uploadState.isUploading || uploadImageMutation.isPending}>
               Send
             </Button>
           </div>
