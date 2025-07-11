@@ -3,7 +3,6 @@
 import { useChat } from '@ai-sdk/react';
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useTRPC } from '@/trpc/client';
-import { useSubscription } from '@trpc/tanstack-react-query';
 import { useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,21 +14,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle, User, Bot, Image as ImageIcon, Upload, X } from 'lucide-react';
 
-// Consolidated state type for image generations
-type GenerationState = {
-  prompt: string;
-  type: 'create' | 'edit';
-  sourceImageUrl?: string;
-  status: 'idle' | 'generating' | 'complete' | 'error';
-  streamingImage?: string;
-  finalImage?: string;
-  error?: string;
-};
 
 export default function Chat() {
   const [input, setInput] = useState('');
-  // Single state object for all generations
-  const [generations, setGenerations] = useState<Record<string, GenerationState>>({});
 
   // Upload state management
   const [uploadState, setUploadState] = useState<{
@@ -38,6 +25,23 @@ export default function Chat() {
     fileName?: string;
     previewUrl?: string;
   }>({ isUploading: false });
+
+  // Streaming generation state
+  const [streamingGenerations, setStreamingGenerations] = useState<{
+    [key: string]: {
+      status: string;
+      streamingImage?: string;
+      prompt: string;
+      type: 'create' | 'edit';
+    }
+  }>({});
+
+  // Streaming description state
+  const [streamingDescriptions, setStreamingDescriptions] = useState<{
+    [key: string]: {
+      description: string;
+    }
+  }>({});
 
   const trpc = useTRPC();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -101,210 +105,78 @@ export default function Chat() {
     }
   };
 
-  // Get the currently active generations
-  const activeCreateGeneration = Object.entries(generations).find(([_, gen]) => gen.type === 'create' && gen.status === 'generating');
-  const [activeCreateId, activeCreateState] = activeCreateGeneration || [null, null];
 
-  const activeEditGeneration = Object.entries(generations).find(([_, gen]) => gen.type === 'edit' && gen.status === 'generating');
-  const [activeEditId, activeEditState] = activeEditGeneration || [null, null];
 
-  // Setup create subscription
-  useSubscription(
-    trpc.generateImageStream.subscriptionOptions(
-      activeCreateState ? {
-        prompt: activeCreateState.prompt,
-      } : { prompt: "" },
-      {
-        enabled: !!activeCreateState,
-        onData: (data: any) => {
-          if (!activeCreateId) return;
-
-          const eventData = data.data;
-
-          if (eventData.type === "progress") {
-            const event = eventData.data;
-            if (event.images && event.images.length > 0) {
-              setGenerations(prev => ({
-                ...prev,
-                [activeCreateId]: {
-                  ...prev[activeCreateId],
-                  streamingImage: event.images[0].url
-                }
-              }));
-            }
-          } else if (eventData.type === "complete") {
-            console.log("Generate completion event:", eventData);
-            const generation = generations[activeCreateId];
-
-            setGenerations(prev => ({
-              ...prev,
-              [activeCreateId]: {
-                ...prev[activeCreateId],
-                status: 'complete',
-                finalImage: eventData.imageUrl,
-                streamingImage: undefined
-              }
-            }));
-
-            // Add tool result with the final image URL
-            addToolResult({
-              toolCallId: activeCreateId,
-              output: {
-                imageUrl: eventData.imageUrl,
-                prompt: generation?.prompt || ''
-              }
-            });
-          } else if (eventData.type === "error") {
-            setGenerations(prev => ({
-              ...prev,
-              [activeCreateId]: {
-                ...prev[activeCreateId],
-                status: 'error',
-                error: eventData.error,
-                streamingImage: undefined
-              }
-            }));
-          }
-        },
-        onError: (error) => {
-          if (!activeCreateId) return;
-          setGenerations(prev => ({
-            ...prev,
-            [activeCreateId]: {
-              ...prev[activeCreateId],
-              status: 'error',
-              error: error.message,
-              streamingImage: undefined
-            }
-          }));
-        },
-      },
-    ),
-  );
-
-  // Setup edit subscription
-  useSubscription(
-    trpc.editImageStream.subscriptionOptions(
-      activeEditState ? {
-        prompt: activeEditState.prompt,
-        imageUrl: activeEditState.sourceImageUrl!,
-      } : { prompt: "", imageUrl: "" },
-      {
-        enabled: !!activeEditState,
-        onData: (data: any) => {
-          if (!activeEditId) return;
-
-          const eventData = data.data;
-
-          if (eventData.type === "progress") {
-            const event = eventData.data;
-            if (event.images && event.images.length > 0) {
-              setGenerations(prev => ({
-                ...prev,
-                [activeEditId]: {
-                  ...prev[activeEditId],
-                  streamingImage: event.images[0].url
-                }
-              }));
-            }
-          } else if (eventData.type === "complete") {
-            const generation = generations[activeEditId];
-
-            setGenerations(prev => ({
-              ...prev,
-              [activeEditId]: {
-                ...prev[activeEditId],
-                status: 'complete',
-                finalImage: eventData.imageUrl,
-                streamingImage: undefined
-              }
-            }));
-
-            // Add tool result with the final edited image URL
-            addToolResult({
-              toolCallId: activeEditId,
-              output: {
-                imageUrl: eventData.imageUrl,
-                prompt: generation?.prompt || '',
-                sourceImageUrl: generation?.sourceImageUrl || ''
-              }
-            });
-          } else if (eventData.type === "error") {
-            setGenerations(prev => ({
-              ...prev,
-              [activeEditId]: {
-                ...prev[activeEditId],
-                status: 'error',
-                error: eventData.error,
-                streamingImage: undefined
-              }
-            }));
-          }
-        },
-        onError: (error) => {
-          if (!activeEditId) return;
-          setGenerations(prev => ({
-            ...prev,
-            [activeEditId]: {
-              ...prev[activeEditId],
-              status: 'error',
-              error: error.message,
-              streamingImage: undefined
-            }
-          }));
-        },
-      },
-    ),
-  );
-
-  const { messages, sendMessage, status, addToolResult } = useChat({
+  const { messages, sendMessage, status } = useChat({
     maxSteps: 5,
-    async onToolCall({ toolCall }) {
-      if (toolCall.toolName === 'startCreateImage') {
-        const input = toolCall.input as { prompt: string };
-
-        // Initialize generation state
-        setGenerations(prev => ({
+    onData: (dataPart) => {
+      // Handle streaming image generation updates
+      if (dataPart.type === 'data-image-generation') {
+        setStreamingGenerations(prev => ({
           ...prev,
-          [toolCall.toolCallId]: {
-            prompt: input.prompt,
-            type: 'create',
-            status: 'generating'
-          }
+          [dataPart.id]: dataPart.data
         }));
-
-        return toolCall.input;
-      } else if (toolCall.toolName === 'startEditImage') {
-        const input = toolCall.input as { prompt: string; imageUrl: string };
-
-        // Initialize edit state
-        setGenerations(prev => ({
+      }
+      
+      // Handle streaming image description updates
+      if (dataPart.type === 'data-image-description') {
+        setStreamingDescriptions(prev => ({
           ...prev,
-          [toolCall.toolCallId]: {
-            prompt: input.prompt,
-            type: 'edit',
-            sourceImageUrl: input.imageUrl,
-            status: 'generating'
-          }
+          [dataPart.id]: dataPart.data
         }));
-
-        return toolCall.input;
       }
     },
   });
+  function truncateStringsInObject(obj: any, maxLength = 100) {
+    const seen = new WeakSet();
+
+    function truncate(value: any): any {
+      if (typeof value === 'string') {
+        return value.length > maxLength
+          ? value.slice(0, maxLength) + '... [truncated]'
+          : value;
+      } else if (Array.isArray(value)) {
+        return value.map(truncate);
+      } else if (value && typeof value === 'object') {
+        if (seen.has(value)) return '[Circular]';
+        seen.add(value);
+        const result = {};
+        for (const key in value) {
+          result[key] = truncate(value[key]);
+        }
+        return result;
+      }
+      return value;
+    }
+
+    return truncate(obj);
+  }
+  console.log("messages", truncateStringsInObject(messages));
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages, streamingGenerations, streamingDescriptions]);
+
+  // Clean up streaming generations when final images arrive
+  useEffect(() => {
+    const latestMessage = messages[messages.length - 1];
+    if (latestMessage?.role === 'assistant') {
+      const hasFiles = latestMessage.parts.some(part => part.type === 'file');
+      const hasText = latestMessage.parts.some(part => part.type === 'text');
+      if (hasFiles) {
+        // Clear streaming generations when final images are received
+        setStreamingGenerations({});
+      }
+      if (hasText) {
+        // Clear streaming descriptions when final text is received
+        setStreamingDescriptions({});
+      }
+    }
   }, [messages]);
 
-  console.log(messages);
 
-
-  const renderImageGeneration = (toolCallId: string) => {
-    const generation = generations[toolCallId];
-    if (!generation) return null;
-
-    const { type, status, streamingImage, finalImage, error, sourceImageUrl } = generation;
+  const renderImageGenerationNew = (data: any) => {
+    const { status, type, streamingImage, error, progress, queuePosition } = data;
     const isEdit = type === 'edit';
 
     return (
@@ -313,31 +185,52 @@ export default function Chat() {
           <div className="flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
             <CardTitle className="text-sm">
-              {status === 'generating' ?
-                (isEdit ? 'Editing image...' : 'Generating image...') :
-                status === 'error' ?
-                  (isEdit ? 'Edit failed' : 'Generation failed') :
-                  (isEdit ? 'Edited image' : 'Generated image')}
+              {status === 'starting' ?
+                (isEdit ? 'Starting edit...' : 'Starting generation...') :
+                status === 'queued' ?
+                  (isEdit ? 'Edit queued...' : 'Generation queued...') :
+                  status === 'generating' ?
+                    (isEdit ? 'Editing image...' : 'Generating image...') :
+                    status === 'error' ?
+                      (isEdit ? 'Edit failed' : 'Generation failed') :
+                      (isEdit ? 'Edited image' : 'Generated image')}
             </CardTitle>
             <Badge variant={isEdit ? 'outline' : 'default'}>
               {isEdit ? 'Edit' : 'Generate'}
             </Badge>
-            <Badge variant={status === 'generating' ? 'secondary' :
-              status === 'error' ? 'destructive' : 'default'}>
-              {status === 'generating' ? 'In progress' :
-                status === 'error' ? 'Error' :
-                  'Complete'}
+            <Badge variant={
+              status === 'starting' || status === 'queued' || status === 'generating' ? 'secondary' :
+                status === 'error' ? 'destructive' : 'default'}>
+              {status === 'starting' ? 'Starting' :
+                status === 'queued' ? 'Queued' :
+                  status === 'generating' ? 'In progress' :
+                    status === 'error' ? 'Error' :
+                      'Complete'}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-
-          {/* Show loading skeleton during creation without image */}
-          {status === 'generating' && !streamingImage && (
-            <Skeleton className="w-full h-48 rounded-md" />
+          {/* Show queue position */}
+          {status === 'queued' && queuePosition && (
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground">Queue position: {queuePosition}</p>
+            </div>
           )}
 
-          {/* Show streaming image during creation */}
+          {/* Show progress */}
+          {status === 'generating' && progress && (
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Progress: {Math.round(progress * 100)}%</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progress * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* Show streaming image during generation */}
           {status === 'generating' && streamingImage && (
             <div className="relative">
               <img
@@ -351,15 +244,9 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Show final image when complete */}
-          {status === 'complete' && finalImage && (
-            <div>
-              <img
-                src={finalImage}
-                alt={isEdit ? "Edited result" : "Created result"}
-                className="w-full h-auto max-h-96 object-contain rounded-md border"
-              />
-            </div>
+          {/* Show loading skeleton during creation without image */}
+          {(status === 'starting' || status === 'queued' || (status === 'generating' && !streamingImage)) && (
+            <Skeleton className="w-full h-48 rounded-md" />
           )}
 
           {/* Show error message */}
@@ -373,6 +260,7 @@ export default function Chat() {
       </Card>
     );
   };
+
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -406,66 +294,76 @@ export default function Chat() {
                 </div>
 
                 <div className="space-y-2">
-
                   {message.parts.map((part, i) => {
                     switch (part.type) {
                       case 'text':
-                        // Check if this is a user message with uploaded image
-                        if (message.role === 'user' && part.text.includes('[User has uploaded an image:')) {
-                          const imageUrlMatch = part.text.match(/\[User has uploaded an image: (.*?)\]/);
-                          const imageUrl = imageUrlMatch?.[1];
-                          const remainingText = part.text.replace(/\[User has uploaded an image: .*?\]\s*/, '');
-
-                          return (
-                            <div key={`${message.id}-${i}`} className="space-y-3">
-                              {imageUrl && (
-                                <Card className="mt-3">
-                                  <CardHeader className="pb-3">
-                                    <div className="flex items-center gap-2">
-                                      <ImageIcon className="h-4 w-4" />
-                                      <CardTitle className="text-sm">Uploaded Image</CardTitle>
-                                      <Badge variant="outline">Upload</Badge>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent className="pt-0">
-                                    <img
-                                      src={imageUrl}
-                                      alt="Uploaded image"
-                                      className="w-full h-auto max-h-96 object-contain rounded-md border"
-                                    />
-                                  </CardContent>
-                                </Card>
-                              )}
-                              {remainingText && (
-                                <div className="prose prose-sm max-w-none">
-                                  {remainingText}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-
                         return (
                           <div key={`${message.id}-${i}`} className="prose prose-sm max-w-none">
                             {part.text}
                           </div>
                         );
-                      case 'tool-startCreateImage':
+                      case 'file':
+                        // Handle all file types (uploaded, generated, edited)
+                        const isGeneratedImage = part.filename?.includes('generated-') || part.filename?.includes('edited-');
+                        const isEditedImage = part.filename?.includes('edited-');
+
                         return (
                           <div key={`${message.id}-${i}`}>
-                            {renderImageGeneration(part.toolCallId)}
-                          </div>
-                        );
-                      case 'tool-startEditImage':
-                        return (
-                          <div key={`${message.id}-${i}`}>
-                            {renderImageGeneration(part.toolCallId)}
+                            <Card className="mt-3">
+                              <CardHeader className="pb-3">
+                                <div className="flex items-center gap-2">
+                                  <ImageIcon className="h-4 w-4" />
+                                  <CardTitle className="text-sm">
+                                    {isEditedImage ? 'Edited Image' :
+                                      isGeneratedImage ? 'Generated Image' :
+                                        'Uploaded Image'}
+                                  </CardTitle>
+                                  <Badge variant={
+                                    isEditedImage ? 'default' :
+                                      isGeneratedImage ? 'secondary' :
+                                        'outline'
+                                  }>
+                                    {isEditedImage ? 'Edit' :
+                                      isGeneratedImage ? 'Generate' :
+                                        'Upload'}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <img
+                                  src={part.url}
+                                  alt={part.filename || "Image"}
+                                  className="w-full h-auto max-h-96 object-contain rounded-md border"
+                                />
+                              </CardContent>
+                            </Card>
                           </div>
                         );
                       default:
                         return null;
                     }
                   })}
+
+                  {/* Show streaming generations for this message */}
+                  {message.role === 'assistant' && 
+                    Object.entries(streamingGenerations).map(([id, generation]) => (
+                      <div key={id}>
+                        {renderImageGenerationNew(generation)}
+                      </div>
+                    ))
+                  }
+
+                  {/* Show streaming descriptions for this message */}
+                  {message.role === 'assistant' && 
+                    Object.entries(streamingDescriptions).map(([id, description]) => (
+                      <div key={id} className="prose prose-sm max-w-none">
+                        <div className="bg-muted/30 p-3 rounded-md">
+                          <div className="text-xs text-muted-foreground mb-1">Describing image...</div>
+                          {description.description}
+                        </div>
+                      </div>
+                    ))
+                  }
                 </div>
               </div>
             </div>
@@ -519,13 +417,26 @@ export default function Chat() {
           onSubmit={e => {
             e.preventDefault();
 
-            // Include uploaded image info in message if available
-            let messageText = input;
+            // Send message with files if uploaded image exists
             if (uploadState.uploadedImage) {
-              messageText = `[User has uploaded an image: ${uploadState.uploadedImage}] ${input}`;
+              sendMessage({
+                role: 'user',
+                parts: [
+                  {
+                    type: 'file' as const,
+                    url: uploadState.uploadedImage,
+                    filename: uploadState.fileName || 'uploaded-image',
+                    mediaType: 'image/jpeg', // Default, could be detected from uploadState
+                  },
+                  {
+                    type: 'text',
+                    text: input,
+                  },
+                ],
+              });
+            } else {
+              sendMessage({ text: input });
             }
-
-            sendMessage({ text: messageText });
             setInput('');
 
             // Clear upload state after sending any message
@@ -557,7 +468,7 @@ export default function Chat() {
               placeholder="Type your message..."
               className="flex-1 bg-background"
             />
-            <Button type="submit" disabled={!input.trim() || status !== 'ready' || !!activeCreateId || !!activeEditId || uploadState.isUploading || uploadImageMutation.isPending}>
+            <Button type="submit" disabled={!input.trim() || status !== 'ready' || uploadState.isUploading || uploadImageMutation.isPending}>
               Send
             </Button>
           </div>
