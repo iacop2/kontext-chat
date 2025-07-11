@@ -63,7 +63,7 @@ export async function POST(req: Request) {
           }),
           execute: async (args, { toolCallId }) => {
             try {
-              // Write initial status as transient data
+              // Write initial status
               writer.write({
                 type: 'data-image-generation',
                 id: toolCallId,
@@ -71,8 +71,7 @@ export async function POST(req: Request) {
                   status: 'starting',
                   prompt: args.prompt,
                   type: 'create'
-                },
-                transient: true
+                }
               });
 
               // Start streaming generation
@@ -87,7 +86,7 @@ export async function POST(req: Request) {
                 }
               });
 
-              // Stream progress events as transient data (only available in onData)
+              // Stream progress events
               for await (const event of stream) {
                 console.log("event", event);
                 if (event.images?.[0]?.url) {
@@ -99,8 +98,7 @@ export async function POST(req: Request) {
                       streamingImage: event.images[0].url,
                       prompt: args.prompt,
                       type: 'create'
-                    },
-                    transient: true // This won't be added to message history
+                    }
                   });
                 }
               }
@@ -119,11 +117,16 @@ export async function POST(req: Request) {
               const imageBlob = await imageResponse.blob();
               const uploadResult = await fal.storage.upload(imageBlob);
 
-              // Write final result as file part for permanent storage
+              // Write final result as data update
               writer.write({
-                type: 'file',
-                url: uploadResult,
-                mediaType: 'image/jpeg',
+                type: 'data-image-generation',
+                id: toolCallId,
+                data: {
+                  status: 'completed',
+                  finalImage: uploadResult,
+                  prompt: args.prompt,
+                  type: 'create'
+                }
               });
 
               return { prompt: args.prompt, imageUrl: uploadResult };
@@ -145,7 +148,7 @@ export async function POST(req: Request) {
           }),
           execute: async (args, { toolCallId }) => {
             try {
-              // Write initial status as transient data
+              // Write initial status
               writer.write({
                 type: 'data-image-generation',
                 id: toolCallId,
@@ -153,8 +156,7 @@ export async function POST(req: Request) {
                   status: 'starting',
                   prompt: args.prompt,
                   type: 'edit'
-                },
-                transient: true
+                }
               });
 
               // Start streaming editing
@@ -170,7 +172,7 @@ export async function POST(req: Request) {
                 }
               });
 
-              // Stream progress events as transient data (only available in onData)
+              // Stream progress events
               for await (const event of stream) {
                 if (event.images?.[0]?.url) {
                   writer.write({
@@ -181,8 +183,7 @@ export async function POST(req: Request) {
                       streamingImage: event.images[0].url,
                       prompt: args.prompt,
                       type: 'edit'
-                    },
-                    transient: true // This won't be added to message history
+                    }
                   });
                 }
               }
@@ -201,18 +202,23 @@ export async function POST(req: Request) {
               const imageBlob = await imageResponse.blob();
               const uploadResult = await fal.storage.upload(imageBlob);
 
-              // Write final result as file part for permanent storage
+              // Write final result as data update
               writer.write({
-                type: 'file',
-                url: uploadResult,
-                mediaType: 'image/jpeg',
+                type: 'data-image-generation',
+                id: toolCallId,
+                data: {
+                  status: 'completed',
+                  finalImage: uploadResult,
+                  prompt: args.prompt,
+                  type: 'edit'
+                }
               });
 
               return { prompt: args.prompt, imageUrl: uploadResult };
-            } catch (error) {
+            } catch (error: any) {
               writer.write({
-                type: 'text',
-                text: `Error editing image: ${error.message}`
+                type: 'error',
+                errorText: `Error editing image: ${error.message}`
               });
               throw error;
             }

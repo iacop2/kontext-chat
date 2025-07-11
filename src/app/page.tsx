@@ -26,22 +26,6 @@ export default function Chat() {
     previewUrl?: string;
   }>({ isUploading: false });
 
-  // Streaming generation state
-  const [streamingGenerations, setStreamingGenerations] = useState<{
-    [key: string]: {
-      status: string;
-      streamingImage?: string;
-      prompt: string;
-      type: 'create' | 'edit';
-    }
-  }>({});
-
-  // Streaming description state
-  const [streamingDescriptions, setStreamingDescriptions] = useState<{
-    [key: string]: {
-      description: string;
-    }
-  }>({});
 
   const trpc = useTRPC();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -109,24 +93,9 @@ export default function Chat() {
 
   const { messages, sendMessage, status } = useChat({
     maxSteps: 5,
-    onData: (dataPart) => {
-      // Handle streaming image generation updates
-      if (dataPart.type === 'data-image-generation') {
-        setStreamingGenerations(prev => ({
-          ...prev,
-          [dataPart.id]: dataPart.data
-        }));
-      }
-      
-      // Handle streaming image description updates
-      if (dataPart.type === 'data-image-description') {
-        setStreamingDescriptions(prev => ({
-          ...prev,
-          [dataPart.id]: dataPart.data
-        }));
-      }
-    },
   });
+
+  // TODO: remove debug logging when done
   function truncateStringsInObject(obj: any, maxLength = 100) {
     const seen = new WeakSet();
 
@@ -140,7 +109,7 @@ export default function Chat() {
       } else if (value && typeof value === 'object') {
         if (seen.has(value)) return '[Circular]';
         seen.add(value);
-        const result = {};
+        const result: Record<string, any> = {};
         for (const key in value) {
           result[key] = truncate(value[key]);
         }
@@ -152,31 +121,16 @@ export default function Chat() {
     return truncate(obj);
   }
   console.log("messages", truncateStringsInObject(messages));
+  // -------------
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingGenerations, streamingDescriptions]);
-
-  // Clean up streaming generations when final images arrive
-  useEffect(() => {
-    const latestMessage = messages[messages.length - 1];
-    if (latestMessage?.role === 'assistant') {
-      const hasFiles = latestMessage.parts.some(part => part.type === 'file');
-      const hasText = latestMessage.parts.some(part => part.type === 'text');
-      if (hasFiles) {
-        // Clear streaming generations when final images are received
-        setStreamingGenerations({});
-      }
-      if (hasText) {
-        // Clear streaming descriptions when final text is received
-        setStreamingDescriptions({});
-      }
-    }
   }, [messages]);
 
 
+
   const renderImageGenerationNew = (data: any) => {
-    const { status, type, streamingImage, error, progress, queuePosition } = data;
+    const { status, type, streamingImage, finalImage, error, progress, queuePosition } = data;
     const isEdit = type === 'edit';
 
     return (
@@ -241,6 +195,17 @@ export default function Chat() {
               <Badge className="absolute top-2 right-2" variant="secondary">
                 Streaming
               </Badge>
+            </div>
+          )}
+
+          {/* Show final image when completed */}
+          {status === 'completed' && finalImage && (
+            <div className="relative">
+              <img
+                src={finalImage}
+                alt="Final generated image"
+                className="w-full h-auto max-h-96 object-contain rounded-md border"
+              />
             </div>
           )}
 
@@ -339,31 +304,25 @@ export default function Chat() {
                             </Card>
                           </div>
                         );
+                      case 'data-image-generation':
+                        return (
+                          <div key={`${message.id}-${i}`}>
+                            {renderImageGenerationNew(part.data as any)}
+                          </div>
+                        );
+                      case 'data-image-description':
+                        return (
+                          <div key={`${message.id}-${i}`} className="prose prose-sm max-w-none">
+                            <div className="bg-muted/30 p-3 rounded-md">
+                              <div className="text-xs text-muted-foreground mb-1">Describing image...</div>
+                              {(part.data as any).description}
+                            </div>
+                          </div>
+                        );
                       default:
                         return null;
                     }
                   })}
-
-                  {/* Show streaming generations for this message */}
-                  {message.role === 'assistant' && 
-                    Object.entries(streamingGenerations).map(([id, generation]) => (
-                      <div key={id}>
-                        {renderImageGenerationNew(generation)}
-                      </div>
-                    ))
-                  }
-
-                  {/* Show streaming descriptions for this message */}
-                  {message.role === 'assistant' && 
-                    Object.entries(streamingDescriptions).map(([id, description]) => (
-                      <div key={id} className="prose prose-sm max-w-none">
-                        <div className="bg-muted/30 p-3 rounded-md">
-                          <div className="text-xs text-muted-foreground mb-1">Describing image...</div>
-                          {description.description}
-                        </div>
-                      </div>
-                    ))
-                  }
                 </div>
               </div>
             </div>
