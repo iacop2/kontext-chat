@@ -35,16 +35,29 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
   return messages.map(msg => {
     if (msg.role === 'user' && msg.parts) {
       const fileParts = msg.parts.filter(part => part.type === 'file');
+      const loraParts = msg.parts.filter(part => part.type === 'data-lora-selection');
+      const textParts = msg.parts.filter(part => part.type === 'text');
+      
+      let combinedText = textParts.map(part => part.text).join(' ');
+      
       if (fileParts.length > 0) {
-        const urls = fileParts.map(part => part.url).join('\n');
-        const textParts = msg.parts.filter(part => part.type === 'text');
-        const combinedText = textParts.map(part => part.text).join(' ') + 
-          `\n[Attached images: ${urls}]`;
-        
+        const imageUrls = fileParts.map(part => part.url).join('\n');
+        combinedText += `\n[Attached images: ${imageUrls}]`;
+      }
+      
+      if (loraParts.length > 0) {
+        const loraData = loraParts.map(part => {
+          const data = (part as any).data;
+          return `Name: ${data.name}, Prompt: ${data.prompt}${data.loraUrl ? `, LoRA URL: ${data.loraUrl}` : ''}`;
+        }).join('\n');
+        combinedText += `\n[Selected LoRA styles: ${loraData}]`;
+      }
+      
+      if (fileParts.length > 0 || loraParts.length > 0) {
         return {
           ...msg,
           parts: [
-            ...fileParts,
+            ...msg.parts,
             { type: 'text' as const, text: combinedText }
           ]
         };
@@ -81,7 +94,8 @@ async function processImageGeneration(
   prompt: string,
   type: 'create' | 'edit',
   imageUrl?: string,
-  imageSize?: string
+  imageSize?: string,
+  loraUrl?: string
 ): Promise<{ prompt: string; imageUrl: string }> {
   try {
     // Write initial status
@@ -103,6 +117,14 @@ async function processImageGeneration(
 
     if (type === 'create' && imageSize) {
       streamInput.image_size = imageSize;
+    }
+
+    // Add LoRA if provided
+    if (loraUrl) {
+      streamInput.loras = [{
+        path: loraUrl,
+        scale: 1.0
+      }];
     }
 
     // Start streaming generation
@@ -173,9 +195,10 @@ export async function POST(req: Request) {
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
             image_size: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).describe('The size/aspect ratio of the image to generate'),
+            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application - extract from data-lora-selection parts in the message'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.image_size);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.image_size, args.loraUrl);
           },
         }),
         editImage: tool({
@@ -183,9 +206,10 @@ export async function POST(req: Request) {
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
             imageUrl: z.string().url().describe('The URL of the image to edit - MUST be from user file attachment data field if present'),
+            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application - extract from data-lora-selection parts in the message'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl, undefined, args.loraUrl);
           },
         }),
         describeImage: tool({
