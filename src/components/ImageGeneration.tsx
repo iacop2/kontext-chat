@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { ImageComponent } from './ImageComponent';
 
 type ImageGenerationData = {
   status: string;
@@ -90,10 +91,9 @@ export function ImageGeneration({ data }: ImageGenerationProps) {
         {/* Show final image when completed */}
         {status === 'completed' && finalImage && (
           <div className="relative">
-            <img
+            <ImageComponent
               src={finalImage}
               alt="Final generated image"
-              className="w-full h-auto max-h-96 object-contain rounded-md border"
             />
           </div>
         )}

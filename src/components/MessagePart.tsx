@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Image as ImageIcon } from 'lucide-react';
 import { ImageGeneration } from './ImageGeneration';
+import { ImageComponent } from './ImageComponent';
 
 type MessagePartProps = {
   part: any;
@@ -19,7 +20,7 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
           {part.text}
         </div>
       );
-    
+
     case 'file':
       const isGeneratedImage = part.filename?.includes('generated-') || part.filename?.includes('edited-');
       const isEditedImage = part.filename?.includes('edited-');
@@ -47,23 +48,22 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <img
+              <ImageComponent
                 src={part.url}
                 alt={part.filename || "Image"}
-                className="w-full h-auto max-h-96 object-contain rounded-md border"
               />
             </CardContent>
           </Card>
         </div>
       );
-    
+
     case 'data-image-generation':
       return (
         <div key={key}>
           <ImageGeneration data={part.data} />
         </div>
       );
-    
+
     case 'data-image-description':
       return (
         <div key={key} className="prose prose-sm max-w-none">
@@ -73,7 +73,7 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
           </div>
         </div>
       );
-    
+
     default:
       return null;
   }
