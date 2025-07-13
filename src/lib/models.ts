@@ -87,29 +87,4 @@ export const styleModels: StyleModel[] = [
     loraUrl:
       "https://huggingface.co/fal/Wojak-Kontext-Dev-LoRA/resolve/main/wojak-kontext-dev-lora.safetensors",
   },
-  {
-    id: "fluffy",
-    name: "Fluffy Style",
-    imageSrc: "/images/styles/fluffy.jpg",
-    prompt: "make this object fluffy",
-  },
-  {
-    id: "glassprism",
-    name: "Glass Prism",
-    imageSrc: "/images/styles/glassprism.jpg",
-    prompt:
-      "make the character/object look like it was made out of glass, black background",
-  },
-  {
-    id: "simpsons",
-    name: "Simpsons Style",
-    imageSrc: "/images/styles/simpsons.jpg",
-    prompt: "convert to Simpsons cartoon style",
-  },
-  {
-    id: "anime",
-    name: "Anime Style",
-    imageSrc: "/images/styles/anime.jpg",
-    prompt: "convert to anime art style with large eyes and stylized features",
-  },
 ];

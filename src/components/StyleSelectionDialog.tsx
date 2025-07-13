@@ -15,11 +15,11 @@ export function StyleSelectionDialog({ open, onOpenChange, onStyleSelect }: Styl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
         <DialogHeader>
           <DialogTitle>Choose a Style</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-y-auto p-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 p-2">
           {styleModels.map((style) => (
             <button
               key={style.id}
