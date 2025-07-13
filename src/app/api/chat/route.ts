@@ -26,9 +26,9 @@ const INFERENCE_CONFIG = {
   resolution_mode: "match_input" as const,
 };
 
-const TEST_MODE = true;
+const TEST_MODE = false;
 
-const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nFor prompts:\n- Always use the user\'s submitted prompt as-is\n- Only ask for clarification if the prompt is truly unclear\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA prompt exactly as-is in the prompt parameter, or the LoRA will not work\n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, deduce from context which image the user wants to edit, prioritizing the most recent one, including generated images\n- If unclear, ask for clarification\n- If only LoRA is selected, apply the LoRA to the most recent image, including generated images';
+const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nFor prompts:\n- Try to keep the prompt as close to the user\'s submitted prompt as possible\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA prompt exactly as-is in the prompt parameter, or the LoRA will not work\n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, deduce from context which image the user wants to edit, prioritizing the most recent one, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n When creating a new image, choose the image size that best matches the user request.';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -165,9 +165,10 @@ async function processImageGeneration(
     });
 
     // Stream progress events
+    let lastStreamingImage: string | null = null;
     for await (const event of stream) {
-      console.log("event", event);
       if (event.images?.[0]?.url) {
+        lastStreamingImage = event.images[0].url;
         writeGenerationStatus(writer, toolCallId, {
           status: 'generating',
           streamingImage: event.images[0].url,
@@ -184,6 +185,14 @@ async function processImageGeneration(
     if (!images?.[0]) {
       throw new Error('No image generated');
     }
+
+    // Write uploading status while keeping last streaming image visible
+    writeGenerationStatus(writer, toolCallId, {
+      status: 'uploading',
+      streamingImage: lastStreamingImage,
+      prompt,
+      type
+    });
 
     // Upload final image to permanent storage
     const uploadResult = await uploadImageToStorage(images[0].url);
@@ -207,8 +216,6 @@ export async function POST(req: Request) {
   try {
     const { messages }: { messages: UIMessage[] } = await req.json();
 
-    console.log("messages", JSON.stringify(messages, null, 2));
-    
     const processedMessages = processMessagesWithFiles(messages);
     console.log("processedMessages", JSON.stringify(truncateStringsInObject(processedMessages), null, 2));
     const modelMessages = convertToModelMessages(processedMessages);
@@ -265,7 +272,6 @@ export async function POST(req: Request) {
             let description = '';
             for await (const chunk of textStream) {
               description += chunk;
-              console.log("chunk", chunk);
               writer.write({
                 id: toolCallId,
                 type: 'data-image-description',

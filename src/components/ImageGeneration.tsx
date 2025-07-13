@@ -35,21 +35,24 @@ export function ImageGeneration({ data }: ImageGenerationProps) {
                 (isEdit ? 'Edit queued...' : 'Generation queued...') :
                 status === 'generating' ?
                   (isEdit ? 'Editing image...' : 'Generating image...') :
-                  status === 'error' ?
-                    (isEdit ? 'Edit failed' : 'Generation failed') :
-                    (isEdit ? 'Edited image' : 'Generated image')}
+                  status === 'uploading' ?
+                    (isEdit ? 'Finalizing edit...' : 'Finalizing generation...') :
+                    status === 'error' ?
+                      (isEdit ? 'Edit failed' : 'Generation failed') :
+                      (isEdit ? 'Edited image' : 'Generated image')}
           </CardTitle>
-          <Badge variant={isEdit ? 'outline' : 'default'}>
+          <Badge variant="outline">
             {isEdit ? 'Edit' : 'Generate'}
           </Badge>
           <Badge variant={
-            status === 'starting' || status === 'queued' || status === 'generating' ? 'secondary' :
+            status === 'starting' || status === 'queued' || status === 'generating' || status === 'uploading' ? 'secondary' :
               status === 'error' ? 'destructive' : 'default'}>
             {status === 'starting' ? 'Starting' :
               status === 'queued' ? 'Queued' :
                 status === 'generating' ? 'In progress' :
-                  status === 'error' ? 'Error' :
-                    'Complete'}
+                  status === 'uploading' ? 'Finalizing' :
+                    status === 'error' ? 'Error' :
+                      'Complete'}
           </Badge>
         </div>
       </CardHeader>
@@ -74,29 +77,20 @@ export function ImageGeneration({ data }: ImageGenerationProps) {
           </div>
         )}
 
-        {/* Show streaming image during generation */}
-        {status === 'generating' && streamingImage && (
-          <div className="relative">
-            <img
-              src={streamingImage}
-              alt="Streaming generation"
-              className="w-full h-auto max-h-96 object-contain rounded-md border"
-            />
-            <Badge className="absolute top-2 right-2" variant="secondary">
-              Streaming
-            </Badge>
-          </div>
-        )}
-
-        {/* Show final image when completed */}
-        {status === 'completed' && finalImage && (
+        {/* Show image during all phases for seamless transition */}
+        {((status === 'generating' || status === 'uploading') && streamingImage) || (status === 'completed' && finalImage) ? (
           <div className="relative">
             <ImageComponent
-              src={finalImage}
-              alt="Final generated image"
+              src={finalImage || streamingImage!}
+              alt={status === 'completed' ? "Final generated image" : "Streaming generation"}
             />
+            {status !== 'completed' && (
+              <Badge className="absolute top-2 right-2" variant="secondary">
+                {status === 'uploading' ? 'Finalizing' : 'Streaming'}
+              </Badge>
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Show loading skeleton during creation without image */}
         {(status === 'starting' || status === 'queued' || (status === 'generating' && !streamingImage)) && (

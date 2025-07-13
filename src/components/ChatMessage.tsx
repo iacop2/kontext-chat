@@ -32,11 +32,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         <div className="space-y-2">
           {message.parts.map((part, i) => (
-            <MessagePart 
-              key={`${message.id}-${i}`} 
-              part={part} 
-              messageId={message.id} 
-              partIndex={i} 
+            <MessagePart
+              key={`${message.id}-${i}`}
+              part={part}
+              messageId={message.id}
+              partIndex={i}
             />
           ))}
         </div>

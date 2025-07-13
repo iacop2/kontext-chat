@@ -123,9 +123,12 @@ export default function Chat() {
     }
     setInput('');
 
-    // Clear upload state after sending (keep style selected)
+    // Clear upload state and style after sending
     if (uploadState.uploadedImage || uploadState.previewUrl) {
       handleRemoveUpload();
+    }
+    if (styleState.selectedStyle) {
+      handleStyleRemove();
     }
   };
 
