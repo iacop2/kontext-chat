@@ -10,7 +10,6 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { useStyleSelection } from '@/hooks/useStyleSelection';
 import { StyleSelectionDialog } from '@/components/StyleSelectionDialog';
 import { ChatMessage } from '@/components/ChatMessage';
-import { ImagePreview } from '@/components/ImagePreview';
 import { ChatHeader } from '@/components/ChatHeader';
 import { truncateStringsInObject } from '@/lib/utils';
 
@@ -36,14 +35,12 @@ export default function Chat() {
     handleStyleRemove,
   } = useStyleSelection();
 
-  // Handle style selection with prompt autofill
+  // Handle style selection
   const handleStyleSelectWithPrompt = (style: any) => {
     handleStyleSelect(style);
-    setInput(style.prompt);
-    autoResize();
   };
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error, regenerate } = useChat({
     maxSteps: 5,
   });
 
@@ -62,7 +59,7 @@ export default function Chat() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && status === 'ready' && !uploadState.isUploading && !uploadImageMutation.isPending) {
+      if ((input.trim() || styleState.selectedStyle) && (status === 'ready' || error) && !uploadState.isUploading && !uploadImageMutation.isPending) {
         handleSubmit(e as any);
       }
     }
@@ -105,14 +102,15 @@ export default function Chat() {
           id: styleState.selectedStyle.id,
           name: styleState.selectedStyle.name,
           loraUrl: styleState.selectedStyle.loraUrl,
+          prompt: styleState.selectedStyle.prompt,
         },
       });
     }
 
-    // Add text content
+    // Add text content (even if empty when style is selected)
     parts.push({
       type: 'text',
-      text: input,
+      text: input || '',
     });
 
     if (parts.length > 1) {
@@ -125,12 +123,9 @@ export default function Chat() {
     }
     setInput('');
 
-    // Clear upload and style state after sending
+    // Clear upload state after sending (keep style selected)
     if (uploadState.uploadedImage || uploadState.previewUrl) {
       handleRemoveUpload();
-    }
-    if (styleState.selectedStyle) {
-      handleStyleRemove();
     }
   };
 
@@ -143,6 +138,28 @@ export default function Chat() {
           {messages.map(message => (
             <ChatMessage key={message.id} message={message} />
           ))}
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-destructive">Something went wrong</h4>
+                  <p className="text-sm text-destructive/80 mt-1">
+                    Please try again. If the issue persists, try refreshing the page.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => regenerate()}
+                  className="text-destructive border-destructive/20 hover:bg-destructive/10"
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
@@ -267,7 +284,7 @@ export default function Chat() {
                 type="submit"
                 size="sm"
                 className="h-fit w-fit p-1.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded border"
-                disabled={!input.trim() || status !== 'ready' || uploadState.isUploading || uploadImageMutation.isPending}
+                disabled={(!input.trim() && !styleState.selectedStyle) || (status !== 'ready' && !error) || uploadState.isUploading || uploadImageMutation.isPending}
               >
                 <ArrowUp className="h-3.5 w-3.5" />
               </Button>

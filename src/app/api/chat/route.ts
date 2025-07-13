@@ -10,6 +10,7 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { createFalClient } from '@fal-ai/client';
+import { truncateStringsInObject } from '@/lib/utils';
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,
@@ -25,7 +26,9 @@ const INFERENCE_CONFIG = {
   resolution_mode: "match_input" as const,
 };
 
-const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". Use the user\'s prompt as-is unless it\'s unclear - do NOT improve or modify their prompt.';
+const TEST_MODE = true;
+
+const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nFor prompts:\n- Always use the user\'s submitted prompt as-is\n- Only ask for clarification if the prompt is truly unclear\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA prompt exactly as-is in the prompt parameter, or the LoRA will not work\n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, deduce from context which image the user wants to edit, prioritizing the most recent one, including generated images\n- If unclear, ask for clarification\n- If only LoRA is selected, apply the LoRA to the most recent image, including generated images';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -38,30 +41,31 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
       const loraParts = msg.parts.filter(part => part.type === 'data-lora-selection');
       const textParts = msg.parts.filter(part => part.type === 'text');
       
-      let combinedText = textParts.map(part => part.text).join(' ');
+      const userPrompt = textParts.map(part => part.text).join(' ');
       
-      if (fileParts.length > 0) {
-        const imageUrls = fileParts.map(part => part.url).join('\n');
-        combinedText += `\n[Attached images: ${imageUrls}]`;
-      }
-      
-      if (loraParts.length > 0) {
-        const loraData = loraParts.map(part => {
+      // Build context object
+      const context = {
+        userPrompt,
+        imageAttached: fileParts.length > 0 ? fileParts.map(part => part.url) : null,
+        loraSelected: loraParts.length > 0 ? loraParts.map(part => {
           const data = (part as any).data;
-          return `Name: ${data.name}, Prompt: ${data.prompt}${data.loraUrl ? `, LoRA URL: ${data.loraUrl}` : ''}`;
-        }).join('\n');
-        combinedText += `\n[Selected LoRA styles: ${loraData}]`;
-      }
+          return {
+            name: data.name,
+            loraUrl: data.loraUrl || null,
+            loraPrompt: data.prompt || null
+          };
+        }) : null
+      };
       
-      if (fileParts.length > 0 || loraParts.length > 0) {
-        return {
-          ...msg,
-          parts: [
-            ...msg.parts,
-            { type: 'text' as const, text: combinedText }
-          ]
-        };
-      }
+      const combinedText = JSON.stringify(context);
+      
+      return {
+        id: msg.id,
+        role: msg.role,
+        parts: [
+          { type: 'text' as const, text: combinedText }
+        ]
+      };
     }
     return msg;
   });
@@ -104,6 +108,30 @@ async function processImageGeneration(
       prompt,
       type
     });
+
+    if (TEST_MODE) {
+      // Mock generation process for test mode
+      const mockImageUrl = 'http://localhost:3000/images/community/2.jpg';
+      
+      // Simulate progress with delays
+      await new Promise(resolve => setTimeout(resolve, 500));
+      writeGenerationStatus(writer, toolCallId, {
+        status: 'generating',
+        streamingImage: mockImageUrl,
+        prompt,
+        type
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      writeGenerationStatus(writer, toolCallId, {
+        status: 'completed',
+        finalImage: mockImageUrl,
+        prompt,
+        type
+      });
+
+      return { prompt, imageUrl: mockImageUrl };
+    }
 
     // Prepare stream input
     const streamInput: any = {
@@ -176,26 +204,29 @@ async function processImageGeneration(
 }
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  try {
+    const { messages }: { messages: UIMessage[] } = await req.json();
 
-  console.log("messages", JSON.stringify(messages, null, 2));
-  
-  const processedMessages = processMessagesWithFiles(messages);
-  const modelMessages = convertToModelMessages(processedMessages);
+    console.log("messages", JSON.stringify(messages, null, 2));
+    
+    const processedMessages = processMessagesWithFiles(messages);
+    console.log("processedMessages", JSON.stringify(truncateStringsInObject(processedMessages), null, 2));
+    const modelMessages = convertToModelMessages(processedMessages);
 
-  const stream = createUIMessageStream({
-    execute: ({ writer }) => {
-      const result = streamText({
-        model: openai('gpt-4.1-mini'),
-        messages: modelMessages,
-        system: SYSTEM_PROMPT,
-        tools: {
+    const stream = createUIMessageStream({
+      execute: ({ writer }) => {
+        try {
+          const result = streamText({
+            model: openai('gpt-4.1-mini'),
+            messages: modelMessages,
+            system: SYSTEM_PROMPT,
+            tools: {
         createImage: tool({
           description: 'Create a new image.',
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
-            image_size: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).describe('The size/aspect ratio of the image to generate'),
-            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application - extract from data-lora-selection parts in the message'),
+            image_size: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).default('portrait_4_3').describe('The size/aspect ratio of the image to generate'),
+            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
             return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.image_size, args.loraUrl);
@@ -205,8 +236,8 @@ export async function POST(req: Request) {
           description: 'Edit an existing image.',
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
-            imageUrl: z.string().url().describe('The URL of the image to edit - MUST be from user file attachment data field if present'),
-            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application - extract from data-lora-selection parts in the message'),
+            imageUrl: z.string().url().describe('The URL of the image to edit'),
+            loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
             return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl, undefined, args.loraUrl);
@@ -251,9 +282,20 @@ export async function POST(req: Request) {
       stopWhen: stepCountIs(5),
       });
 
-      writer.merge(result.toUIMessageStream());
-    },
-  });
+          writer.merge(result.toUIMessageStream());
+        } catch (error: any) {
+          console.error('Error in streamText execution:', error);
+          writeError(writer, `Error processing request: ${error.message}`);
+        }
+      },
+    });
 
-  return createUIMessageStreamResponse({ stream });
+    return createUIMessageStreamResponse({ stream });
+  } catch (error: any) {
+    console.error('Error in POST handler:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', message: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }

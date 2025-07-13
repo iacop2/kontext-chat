@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function truncateStringsInObject(obj: any, maxLength = 100) {
+export function truncateStringsInObject(obj: any, maxLength = 1000) {
   const seen = new WeakSet();
 
   function truncate(value: any): any {
