@@ -21,7 +21,7 @@ const examples: ExampleCard[] = [
     description: 'Apply styles to your images',
     prompt: 'Turn this image into pixel style.',
     icon: <Palette className="h-6 w-6" />,
-    realPrompt: '',
+    realPrompt: 'Turn this image into pixel style.',
     imageUrl: `https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg`,
     styleId: 'pixel',
   },

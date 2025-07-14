@@ -141,7 +141,7 @@ export default function Chat() {
           id: styleState.selectedStyle.id,
           name: styleState.selectedStyle.name,
           loraUrl: styleState.selectedStyle.loraUrl,
-          prompt: styleState.selectedStyle.prompt,
+          triggerWord: styleState.selectedStyle.triggerWord,
         },
       });
     }

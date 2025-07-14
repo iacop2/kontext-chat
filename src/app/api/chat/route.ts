@@ -29,7 +29,7 @@ const INFERENCE_CONFIG = {
   resolution_mode: "match_input" as const,
 };
 
-const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nKeep the user prompt exactly as-is, do not modify it in any way.\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA prompt exactly as-is in the prompt parameter, or the LoRA will not work\n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, and no image is indicated by the user, use the most recent image in the chat messages, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n When creating a new image, choose the image size that best matches the user request.\n\n IMPORTANT: When processing image URLs, ignore any random text or animal names in the URL path (like "elephant", "zebra", etc.) as these are just random identifiers and do not define the actual content or context of the image.';
+const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nKeep the user prompt exactly as-is, do not modify it in any way.\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA trigger word exactly as-is in the prompt parameter, or the LoRA will not work. When user prompt is empty, include the trigger word like this: "Turn the image into the **triggerWord** style". \n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, and no image is indicated by the user, use the most recent image in the chat messages, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n When creating a new image, choose the image size that best matches the user request.\n\n IMPORTANT: When processing image URLs, ignore any random text or animal names in the URL path (like "elephant", "zebra", etc.) as these are just random identifiers and do not define the actual content or context of the image.';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -53,7 +53,7 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
           return {
             name: data.name,
             loraUrl: data.loraUrl || null,
-            loraPrompt: data.prompt || null
+            loraTriggerWord: data.triggerWord || null
           };
         }) : null
       };
