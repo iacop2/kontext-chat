@@ -7,6 +7,8 @@ type UploadState = {
   uploadedImage?: string;
   fileName?: string;
   previewUrl?: string;
+  isExampleImage?: boolean;
+  exampleImageUrl?: string;
 };
 
 export function useFileUpload() {
@@ -54,6 +56,16 @@ export function useFileUpload() {
     }
   };
 
+  const handleExampleImage = (imageUrl: string, fileName: string = 'example-image.jpg') => {
+    setUploadState({
+      isUploading: false,
+      previewUrl: imageUrl,
+      fileName,
+      isExampleImage: true,
+      exampleImageUrl: imageUrl
+    });
+  };
+
   const handleRemoveUpload = () => {
     setUploadState({ isUploading: false });
     if (fileInputRef.current) {
@@ -65,6 +77,7 @@ export function useFileUpload() {
     uploadState,
     handleFileUpload,
     handleRemoveUpload,
+    handleExampleImage,
     uploadImageMutation,
     fileInputRef
   };

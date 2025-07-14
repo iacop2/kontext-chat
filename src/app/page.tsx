@@ -11,7 +11,9 @@ import { useStyleSelection } from '@/hooks/useStyleSelection';
 import { StyleSelectionDialog } from '@/components/StyleSelectionDialog';
 import { ChatMessage } from '@/components/ChatMessage';
 import { ChatHeader } from '@/components/ChatHeader';
+import { ExampleCards } from '@/components/ExampleCards';
 import { truncateStringsInObject } from '@/lib/utils';
+import { styleModels } from '@/lib/models';
 
 
 
@@ -25,6 +27,7 @@ export default function Chat() {
     uploadState,
     handleFileUpload,
     handleRemoveUpload,
+    handleExampleImage,
     uploadImageMutation,
     fileInputRef
   } = useFileUpload();
@@ -41,7 +44,7 @@ export default function Chat() {
   };
 
   const { messages, sendMessage, status, error, regenerate } = useChat({
-    maxSteps: 5,
+    maxSteps: 1,
   });
 
   // TODO: remove debug logging when done
@@ -77,6 +80,35 @@ export default function Chat() {
     autoResize();
   }, [uploadState.previewUrl, uploadState.isUploading, styleState.selectedStyle]);
 
+  // Handle example selection
+  const handleExampleSelect = (prompt: string, imageUrl?: string, styleId?: string) => {
+    // Reset previous inputs first
+    setInput('');
+    handleRemoveUpload();
+    handleStyleRemove();
+
+    // Set new example data
+    setInput(prompt);
+
+    // If there's an image URL, load it using the new function
+    if (imageUrl) {
+      handleExampleImage(imageUrl, 'example-image.jpg');
+    }
+
+    // If there's a style ID, select the corresponding style
+    if (styleId) {
+      const style = styleModels.find(s => s.id === styleId);
+      if (style) {
+        handleStyleSelect(style);
+      }
+    }
+
+    // Focus the textarea after setting the input
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +117,14 @@ export default function Chat() {
     const parts: Array<any> = [];
 
     // Add uploaded image if present
-    if (uploadState.uploadedImage) {
+    if (uploadState.isExampleImage && uploadState.exampleImageUrl) {
+      parts.push({
+        type: 'file' as const,
+        url: uploadState.exampleImageUrl,
+        filename: uploadState.fileName || 'example-image',
+        mediaType: 'image/jpeg',
+      });
+    } else if (uploadState.uploadedImage) {
       parts.push({
         type: 'file' as const,
         url: uploadState.uploadedImage,
@@ -136,36 +175,44 @@ export default function Chat() {
     <div className="flex flex-col h-screen bg-background">
       <ChatHeader />
 
-      <ScrollArea className="flex-1 p-4">
-        <div className="max-w-3xl mx-auto space-y-4">
-          {messages.map(message => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+      <div className="flex-1 flex flex-col">
+        {messages.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center p-4">
+            <ExampleCards onExampleSelect={handleExampleSelect} />
+          </div>
+        ) : (
+          <ScrollArea className="flex-1">
+            <div className="max-w-3xl mx-auto space-y-4 p-4">
+              {messages.map(message => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
 
-          {/* Error Display */}
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium text-destructive">Something went wrong</h4>
-                  <p className="text-sm text-destructive/80 mt-1">
-                    Please try again. If the issue persists, try refreshing the page.
-                  </p>
+              {/* Error Display */}
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-destructive">Something went wrong</h4>
+                      <p className="text-sm text-destructive/80 mt-1">
+                        Please try again. If the issue persists, try refreshing the page.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => regenerate()}
+                      className="text-destructive border-destructive/20 hover:bg-destructive/10"
+                    >
+                      Retry
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => regenerate()}
-                  className="text-destructive border-destructive/20 hover:bg-destructive/10"
-                >
-                  Retry
-                </Button>
-              </div>
-            </div>
-          )}
+              )}
 
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+        )}
+      </div>
 
       <div className="p-4">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
@@ -251,7 +298,7 @@ export default function Chat() {
                 autoResize();
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Send a message..."
+              placeholder="Upload an image to edit, or describe what you'd like to create"
               className={`w-full resize-none rounded border border-stroke-base bg-background px-3 text-sm text-content placeholder:text-content-lighter focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${(uploadState.previewUrl || styleState.selectedStyle) ? 'min-h-[100px] pt-28 pb-10' : 'min-h-[48px] py-2 pb-10'
                 }`}
               style={{

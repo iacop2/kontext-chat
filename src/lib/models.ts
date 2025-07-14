@@ -64,14 +64,6 @@ export const styleModels: StyleModel[] = [
       "https://huggingface.co/Owen777/Kontext-Style-Loras/resolve/main/LEGO_lora_weights.safetensors",
   },
   {
-    id: "broccoli",
-    name: "Broccoli Hair",
-    imageSrc: "/images/styles/broccoli.jpeg",
-    prompt: "Change hair to a broccoli haircut",
-    loraUrl:
-      "https://huggingface.co/fal/Broccoli-Hair-Kontext-Dev-LoRA/resolve/main/broccoli-hair-kontext-dev-lora.safetensors",
-  },
-  {
     id: "plushie",
     name: "Plushie Style",
     imageSrc: "/images/styles/plushie.png",

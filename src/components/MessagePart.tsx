@@ -64,6 +64,13 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
         </div>
       );
 
+    case 'data-image-description':
+      return (
+        <div key={key} className="prose prose-sm max-w-none">
+          {part.data?.description || ''}
+        </div>
+      );
+
     default:
       return null;
   }
