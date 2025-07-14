@@ -10,9 +10,10 @@ type Message = {
 
 type ChatMessageProps = {
   message: Message;
+  onUseAsInput?: (imageUrl: string) => void;
 };
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onUseAsInput }: ChatMessageProps) {
   return (
     <div className="flex gap-3">
       <Avatar className="h-8 w-8">
@@ -37,6 +38,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               part={part}
               messageId={message.id}
               partIndex={i}
+              onUseAsInput={onUseAsInput}
             />
           ))}
         </div>

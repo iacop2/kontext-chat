@@ -8,9 +8,10 @@ type MessagePartProps = {
   part: any;
   messageId: string;
   partIndex: number;
+  onUseAsInput?: (imageUrl: string) => void;
 };
 
-export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
+export function MessagePart({ part, messageId, partIndex, onUseAsInput }: MessagePartProps) {
   const key = `${messageId}-${partIndex}`;
 
   switch (part.type) {
@@ -21,7 +22,7 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
         </div>
       );
 
-    case 'file':
+    case 'file': {
       const isGeneratedImage = part.filename?.includes('generated-') || part.filename?.includes('edited-');
       const isEditedImage = part.filename?.includes('edited-');
 
@@ -51,16 +52,18 @@ export function MessagePart({ part, messageId, partIndex }: MessagePartProps) {
               <ImageComponent
                 src={part.url}
                 alt={part.filename || "Image"}
+                onUseAsInput={onUseAsInput ? () => onUseAsInput(part.url) : undefined}
               />
             </CardContent>
           </Card>
         </div>
       );
+    }
 
     case 'data-image-generation':
       return (
         <div key={key}>
-          <ImageGeneration data={part.data} />
+          <ImageGeneration data={part.data} onUseAsInput={onUseAsInput} />
         </div>
       );
 

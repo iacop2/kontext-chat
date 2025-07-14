@@ -80,6 +80,13 @@ export default function Chat() {
     autoResize();
   }, [uploadState.previewUrl, uploadState.isUploading, styleState.selectedStyle]);
 
+  // Handle using generated image as input
+  const handleUseImageAsInput = (imageUrl: string) => {
+    // Clear current upload state and set the new image
+    handleRemoveUpload();
+    handleExampleImage(imageUrl, 'generated-image.jpg');
+  };
+
   // Handle example selection
   const handleExampleSelect = (prompt: string, imageUrl?: string, styleId?: string) => {
     // Reset previous inputs first
@@ -184,7 +191,7 @@ export default function Chat() {
           <ScrollArea className="flex-1">
             <div className="max-w-3xl mx-auto space-y-4 p-4">
               {messages.map(message => (
-                <ChatMessage key={message.id} message={message} />
+                <ChatMessage key={message.id} message={message} onUseAsInput={handleUseImageAsInput} />
               ))}
 
               {/* Error Display */}

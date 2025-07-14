@@ -17,9 +17,10 @@ type ImageGenerationData = {
 
 type ImageGenerationProps = {
   data: ImageGenerationData;
+  onUseAsInput?: (imageUrl: string) => void;
 };
 
-export function ImageGeneration({ data }: ImageGenerationProps) {
+export function ImageGeneration({ data, onUseAsInput }: ImageGenerationProps) {
   const { status, type, streamingImage, finalImage, error } = data;
   const isEdit = type === 'edit';
 
@@ -76,6 +77,8 @@ export function ImageGeneration({ data }: ImageGenerationProps) {
             <ImageComponent
               src={finalImage || streamingImage!}
               alt={status === 'completed' ? "Final generated image" : "Streaming generation"}
+              showDownload={status === 'completed' && !!finalImage}
+              onUseAsInput={status === 'completed' && finalImage ? () => onUseAsInput?.(finalImage) : undefined}
             />
             {status !== 'completed' && (
               <Badge className="absolute top-2 right-2" variant="secondary">
