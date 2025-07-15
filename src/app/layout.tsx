@@ -5,12 +5,12 @@ import { BotIdClient } from 'botid/client';
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 
-const title = "Kontext Chat";
+const title = "kontext chat";
 const description = "Create and edit images with a chat interface.";
 export const metadata: Metadata = {
   title: {
     default: title,
-    template: "%s | Kontext Chat",
+    template: "%s | kontext chat",
   },
   description: description,
   keywords: [
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     siteName: title,
     images: [
       {
-        url: "/og-image.jpeg",
+        url: "/og-image.jpg",
         alt: title,
         type: "image/jpeg",
       },
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     site: "@fal_ai",
     images: [
       {
-        url: "/og-image.jpeg",
+        url: "/og-image.jpg",
         alt: title,
       },
     ],
