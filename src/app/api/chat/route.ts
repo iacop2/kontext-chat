@@ -9,9 +9,6 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { createFalClient } from '@fal-ai/client';
-import { truncateStringsInObject } from '@/lib/utils';
-
-
 const TEST_MODE = false;
 
 const fal = createFalClient({
@@ -220,7 +217,6 @@ export async function POST(req: Request) {
     const { messages }: { messages: UIMessage[] } = await req.json();
 
     const processedMessages = processMessagesWithFiles(messages);
-    console.log("processedMessages", JSON.stringify(truncateStringsInObject(processedMessages), null, 2));
     const modelMessages = convertToModelMessages(processedMessages);
 
     const stream = createUIMessageStream({

@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { CoreProviders } from "./core-providers";
-import { focal, hal, halMono, commitMono, inconsolata } from "@/lib/fonts";
+import { focal } from "@/lib/fonts";
 import { BotIdClient } from 'botid/client';
+import { TooltipProvider } from "@/components/ui/tooltip";
 
+
+const title = "Kontext Chat";
+const description = "Create and edit images with a chat interface.";
 export const metadata: Metadata = {
   title: {
-    default: "Flux Kontext Dev - AI Style Transfer | Powered by fal.ai",
-    template: "%s | Flux Kontext Dev",
+    default: title,
+    template: "%s | Kontext Chat",
   },
-  description:
-    "Transform your photos with AI-powered style transfer in seconds. Choose from LoRA models and prompt-based styles including anime, oil painting, cyberpunk, and more. Powered by fal.ai's fast AI infrastructure.",
+  description: description,
   keywords: [
     "AI style transfer",
     "image transformation",
@@ -23,16 +25,13 @@ export const metadata: Metadata = {
     "machine learning",
     "image generation",
   ],
-  authors: [{ name: "fal.ai" }],
-  creator: "fal.ai",
-  publisher: "fal.ai",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://flux-kontext-demo.vercel.app",
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   ),
   alternates: {
     canonical: "/",
@@ -41,29 +40,29 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "Flux Kontext Dev - AI Style Transfer | Powered by fal.ai",
+    title: title,
     description:
-      "Transform your photos with AI-powered style transfer in seconds. Choose from LoRA models and prompt-based styles.",
-    siteName: "Flux Kontext Dev",
+      description,
+    siteName: title,
     images: [
       {
         url: "/og-image.jpeg",
-        alt: "Flux Kontext Dev - AI Style Transfer Demo",
+        alt: title,
         type: "image/jpeg",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Flux Kontext Dev - AI Style Transfer | Powered by fal.ai",
+    title: title,
     description:
-      "Transform your photos with AI-powered style transfer in seconds. Choose from LoRA models and prompt-based styles.",
+      description,
     creator: "@fal_ai",
     site: "@fal_ai",
     images: [
       {
         url: "/og-image.jpeg",
-        alt: "Flux Kontext Dev - AI Style Transfer Demo",
+        alt: title,
       },
     ],
   },
@@ -89,11 +88,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={[
-        hal.variable,
-        halMono.variable,
         focal.variable,
-        inconsolata.variable,
-        commitMono.variable,
       ].join(" ")}
       suppressHydrationWarning
     >
@@ -107,7 +102,9 @@ export default function RootLayout({
         ]} />
       </head>
       <body className={`font-sans bg-background text-foreground min-h-screen`}>
-        <CoreProviders>{children}</CoreProviders>
+        <TooltipProvider delayDuration={300}>
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );
