@@ -4,7 +4,6 @@ import {
   streamText, 
   UIMessage, 
   convertToModelMessages, 
-  stepCountIs,
   createUIMessageStream,
   createUIMessageStreamResponse
 } from 'ai';
@@ -26,10 +25,9 @@ const INFERENCE_CONFIG = {
   guidance_scale: 2.5,
   num_images: 1,
   enable_safety_checker: true,
-  resolution_mode: "match_input" as const,
 };
 
-const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nKeep the user prompt exactly as-is, do not modify it in any way.\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA trigger word exactly as-is in the prompt parameter, or the LoRA will not work. When user prompt is empty, include the trigger word like this: "Turn the image into the **triggerWord** style". \n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, and no image is indicated by the user, use the most recent image in the chat messages, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n When creating a new image, choose the image size that best matches the user request.\n\n IMPORTANT: When processing image URLs, ignore any random text or animal names in the URL path (like "elephant", "zebra", etc.) as these are just random identifiers and do not define the actual content or context of the image.';
+const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nKeep the user prompt exactly as-is, do not modify it in any way.\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA trigger word exactly as-is in the prompt parameter, or the LoRA will not work. When user prompt is empty, include the trigger word like this: "Turn the image into the **triggerWord** style". \n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, and no image is indicated by the user, use the most recent image in the chat messages, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n\nFor imageSize input (createImage), available values are: square_hd, square, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9 with default portrait_4_3. For resolutionMode input (editImage), available values are: match_input, 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21 with default match_input. Always pass default value unless the user specify a size/resolution/aspect ratio, in that case pass the nearest one in the available ones.\n\n IMPORTANT: When processing image URLs, ignore any random text or animal names in the URL path (like "elephant", "zebra", etc.) as these are just random identifiers and do not define the actual content or context of the image.';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -148,6 +146,10 @@ async function processImageGeneration(
       streamInput.image_size = imageSize;
     }
 
+    if (type === 'edit' && imageSize) {
+      streamInput.resolution_mode = imageSize;
+    }
+
     // Add LoRA if provided
     if (loraUrl) {
       streamInput.loras = [{
@@ -233,22 +235,23 @@ export async function POST(req: Request) {
           description: 'Create a new image.',
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
-            image_size: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).default('portrait_4_3').describe('The size/aspect ratio of the image to generate'),
+            imageSize: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).default('portrait_4_3').describe('The size/aspect ratio of the image to generate'),
             loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.image_size, args.loraUrl);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.imageSize, args.loraUrl);
           },
         }),
         editImage: tool({
           description: 'Edit an existing image.',
           inputSchema: z.object({
             prompt: z.string().describe('The prompt for the image'),
+            resolutionMode: z.enum(['match_input', '1:1', '16:9', '21:9', '3:2', '2:3', '4:5', '5:4', '3:4', '4:3', '9:16', '9:21']).default('match_input').describe('The size/aspect ratio of the image to generate'),
             imageUrl: z.string().url().describe('The URL of the image to edit'),
             loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl, undefined, args.loraUrl);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl, args.resolutionMode, args.loraUrl);
           },
         }),
         describeImage: tool({
