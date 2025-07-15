@@ -29,7 +29,6 @@ export default function Chat() {
     handleFileUpload,
     handleRemoveUpload,
     handleExampleImage,
-    uploadImageMutation,
     fileInputRef
   } = useFileUpload();
 
@@ -63,7 +62,7 @@ export default function Chat() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if ((input.trim() || styleState.selectedStyle) && (status === 'ready' || error) && !uploadState.isUploading && !uploadImageMutation.isPending) {
+      if ((input.trim() || styleState.selectedStyle) && (status === 'ready' || error) && !uploadState.isUploading) {
         handleSubmit(e as any);
       }
     }
@@ -324,7 +323,7 @@ export default function Chat() {
                 size="sm"
                 className="h-fit w-fit px-2 py-1.5 rounded text-content-lighter hover:text-content bg-transparent border-0 hover:bg-surface-secondary flex items-center gap-1"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadState.isUploading || uploadImageMutation.isPending}
+                disabled={uploadState.isUploading}
               >
                 <ImageIcon className="h-3.5 w-3.5" />
                 <span className="text-xs">Image</span>
@@ -345,7 +344,7 @@ export default function Chat() {
                 type="submit"
                 size="sm"
                 className="h-fit w-fit p-1.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded border"
-                disabled={(!input.trim() && !styleState.selectedStyle) || (status !== 'ready' && !error) || uploadState.isUploading || uploadImageMutation.isPending}
+                disabled={(!input.trim() && !styleState.selectedStyle) || (status !== 'ready' && !error) || uploadState.isUploading}
               >
                 <ArrowUp className="h-3.5 w-3.5" />
               </Button>

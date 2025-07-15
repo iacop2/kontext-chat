@@ -12,7 +12,7 @@ import { createFalClient } from '@fal-ai/client';
 import { truncateStringsInObject } from '@/lib/utils';
 
 
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,

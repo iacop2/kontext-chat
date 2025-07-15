@@ -1,6 +1,5 @@
 import { useState, useRef, ChangeEvent } from 'react';
-import { useTRPC } from '@/trpc/client';
-import { useMutation } from '@tanstack/react-query';
+import { uploadImage } from '@/actions/upload-image';
 
 type UploadState = {
   isUploading: boolean;
@@ -14,8 +13,6 @@ type UploadState = {
 export function useFileUpload() {
   const [uploadState, setUploadState] = useState<UploadState>({ isUploading: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const trpc = useTRPC();
-  const uploadImageMutation = useMutation(trpc.uploadImage.mutationOptions());
 
   const fileToDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -41,14 +38,18 @@ export function useFileUpload() {
       const previewUrl = await fileToDataURL(file);
       setUploadState(prev => ({ ...prev, previewUrl, fileName: file.name }));
 
-      const result = await uploadImageMutation.mutateAsync({ image: previewUrl });
+      const result = await uploadImage(previewUrl);
 
-      setUploadState({
-        isUploading: false,
-        uploadedImage: result.url,
-        fileName: file.name,
-        previewUrl
-      });
+      if (result.success) {
+        setUploadState({
+          isUploading: false,
+          uploadedImage: result.url,
+          fileName: file.name,
+          previewUrl
+        });
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error('Upload failed:', error);
       setUploadState({ isUploading: false });
@@ -78,7 +79,6 @@ export function useFileUpload() {
     handleFileUpload,
     handleRemoveUpload,
     handleExampleImage,
-    uploadImageMutation,
     fileInputRef
   };
 }

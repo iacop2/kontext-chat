@@ -104,10 +104,6 @@ export default function RootLayout({
             path: '/api/fal',
             method: 'POST',
           },
-          {
-            path: '/api/trpc/*',
-            method: 'POST',
-          },
         ]} />
       </head>
       <body className={`font-sans bg-background text-foreground min-h-screen`}>
