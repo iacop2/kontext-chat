@@ -12,7 +12,7 @@ import { createFalClient } from '@fal-ai/client';
 import { truncateStringsInObject } from '@/lib/utils';
 
 
-const TEST_MODE = false;
+const TEST_MODE = true;
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,
@@ -110,10 +110,10 @@ async function processImageGeneration(
 
     if (TEST_MODE) {
       // Mock generation process for test mode
-      const mockImageUrl = 'http://localhost:3000/images/community/2.jpg';
+      const mockImageUrl = 'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
       
       // Simulate progress with delays
-      await new Promise(resolve => setTimeout(resolve, 20000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
       writeGenerationStatus(writer, toolCallId, {
         status: 'generating',
         streamingImage: mockImageUrl,
@@ -121,7 +121,7 @@ async function processImageGeneration(
         type
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
       writeGenerationStatus(writer, toolCallId, {
         status: 'completed',
         finalImage: mockImageUrl,

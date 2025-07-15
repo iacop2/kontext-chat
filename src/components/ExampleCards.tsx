@@ -2,6 +2,10 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Palette, Sparkles, Eye, Edit3 } from 'lucide-react';
+import image_1 from '../../public/images/community/2.jpg';
+import image_2 from '../../public/images/community/4.jpg';
+import image_3 from '../../public/images/community/3.jpg';
+import { StaticImageData } from 'next/image';
 
 interface ExampleCard {
   id: string;
@@ -14,6 +18,11 @@ interface ExampleCard {
   styleId?: string;
 }
 
+const devImageUrl_1 = `https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg`;
+const devImageUrl_2 = `https://v3.fal.media/files/zebra/KLLnXEO7x2xMSzXZCfezX_1752490058499.jpeg`;
+const devImageUrl_3 = `https://v3.fal.media/files/rabbit/MHnxLlqPjO3S4ukF_i3BK_1752490290906.jpeg`;
+
+
 const examples: ExampleCard[] = [
   {
     id: 'style-transfer',
@@ -22,7 +31,7 @@ const examples: ExampleCard[] = [
     prompt: 'Turn this image into pixel style',
     icon: <Palette className="h-6 w-6" />,
     realPrompt: 'Turn this image into pixel style',
-    imageUrl: `https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg`,
+    imageUrl: process.env.NODE_ENV === 'development' ? devImageUrl_1 : image_1.src,
     styleId: 'pixel',
   },
   {
@@ -32,7 +41,7 @@ const examples: ExampleCard[] = [
     icon: <Edit3 className="h-6 w-6" />,
     prompt: 'Remove all people in the background',
     realPrompt: 'Eliminate all the people in the background while maintaining the facial features of the main subject. Keep the proportions and background unchanged. Naturally supplement and redraw the details of the removed areas to match the elements in the original image',
-    imageUrl: `https://v3.fal.media/files/zebra/KLLnXEO7x2xMSzXZCfezX_1752490058499.jpeg`,
+    imageUrl: process.env.NODE_ENV === 'development' ? devImageUrl_2 : image_2.src,
   },
   {
     id: 'describe-image',
@@ -41,7 +50,7 @@ const examples: ExampleCard[] = [
     icon: <Eye className="h-6 w-6" />,
     prompt: 'Describe this image in detail',
     realPrompt: 'Describe this image in detail',
-    imageUrl: `https://v3.fal.media/files/rabbit/MHnxLlqPjO3S4ukF_i3BK_1752490290906.jpeg`,
+    imageUrl: process.env.NODE_ENV === 'development' ? devImageUrl_3 : image_3.src,
   },
   {
     id: 'generate-image',

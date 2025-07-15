@@ -1,5 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { StyleModel, styleModels } from '@/lib/models';
+import Image from 'next/image';
+
 
 type StyleSelectionDialogProps = {
   open: boolean;
@@ -27,7 +29,7 @@ export function StyleSelectionDialog({ open, onOpenChange, onStyleSelect }: Styl
               className="group relative overflow-hidden rounded border-2 border-transparent hover:border-primary transition-all duration-200 focus:outline-none focus:border-primary"
             >
               <div className="aspect-square overflow-hidden rounded">
-                <img
+                <Image
                   src={style.imageSrc}
                   alt={style.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"

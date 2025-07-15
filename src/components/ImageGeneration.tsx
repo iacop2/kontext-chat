@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { ImageComponent } from './ImageComponent';
 
@@ -25,7 +24,7 @@ export function ImageGeneration({ data, onUseAsInput }: ImageGenerationProps) {
   const isEdit = type === 'edit';
 
   // Show minimal spinner when starting
-  if (status === 'starting') {
+  if (status === 'starting' || status === 'queued') {
     return (
       <div className="mt-3 flex items-center gap-2 animate-pulse">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -57,10 +56,10 @@ export function ImageGeneration({ data, onUseAsInput }: ImageGenerationProps) {
                     (isEdit ? 'Edited image' : 'Generated image')}
           </CardTitle>
           <Badge variant="outline">
-            {isEdit ? 'Edit' : 'Generate'}
+            {isEdit ? 'Edit' : 'Create'}
           </Badge>
           <Badge variant={
-            status === 'starting' || status === 'queued' || status === 'generating' || status === 'uploading' ? 'secondary' :
+            status === 'starting' || status === 'queued' || status === 'generating' || status === 'uploading' ? 'default' :
               status === 'error' ? 'destructive' : 'default'}>
             {status === 'starting' || status === 'queued' ? 'Starting' :
               status === 'generating' ? 'In progress' :
@@ -80,11 +79,6 @@ export function ImageGeneration({ data, onUseAsInput }: ImageGenerationProps) {
               showDownload={status === 'completed' && !!finalImage}
               onUseAsInput={status === 'completed' && finalImage ? () => onUseAsInput?.(finalImage) : undefined}
             />
-            {status !== 'completed' && (
-              <Badge className="absolute top-2 right-2" variant="secondary">
-                {status === 'uploading' ? 'Finalizing' : 'Streaming'}
-              </Badge>
-            )}
           </div>
         ) : null}
 

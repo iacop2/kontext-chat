@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUp, X, Palette, Image } from 'lucide-react';
+import { ArrowUp, X, Palette, Image as ImageIcon } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useStyleSelection } from '@/hooks/useStyleSelection';
 import { StyleSelectionDialog } from '@/components/StyleSelectionDialog';
@@ -14,6 +14,7 @@ import { ChatHeader } from '@/components/ChatHeader';
 import { ExampleCards } from '@/components/ExampleCards';
 import { truncateStringsInObject } from '@/lib/utils';
 import { styleModels } from '@/lib/models';
+import Image from 'next/image';
 
 
 
@@ -125,9 +126,10 @@ export default function Chat() {
 
     // Add uploaded image if present
     if (uploadState.isExampleImage && uploadState.exampleImageUrl) {
+      const url = process.env.NODE_ENV === 'development' ? uploadState.exampleImageUrl : window.location.origin + uploadState.exampleImageUrl;
       parts.push({
         type: 'file' as const,
-        url: uploadState.exampleImageUrl,
+        url: url,
         filename: uploadState.fileName || 'example-image',
         mediaType: 'image/jpeg',
       });
@@ -242,7 +244,7 @@ export default function Chat() {
                           <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-400 border-t-gray-600"></div>
                         </div>
                         <div className="absolute bottom-1 left-1 bg-black/70 rounded p-0.5">
-                          <Image className="h-3.5 w-3.5 text-white" />
+                          <ImageIcon className="h-3.5 w-3.5 text-white" />
                         </div>
                       </div>
                     ) : uploadState.previewUrl ? (
@@ -252,9 +254,10 @@ export default function Chat() {
                             src={uploadState.previewUrl}
                             alt={uploadState.fileName}
                             className="w-full h-full object-cover rounded"
+                            key={uploadState.previewUrl}
                           />
                           <div className="absolute bottom-1 left-1 bg-black/70 rounded p-0.5">
-                            <Image className="h-3.5 w-3.5 text-white" />
+                            <ImageIcon className="h-3.5 w-3.5 text-white" />
                           </div>
                           <Button
                             variant="secondary"
@@ -275,10 +278,11 @@ export default function Chat() {
                   <div className="relative">
                     <div className="relative inline-block mb-2">
                       <div className="relative w-20 h-20">
-                        <img
+                        <Image
                           src={styleState.selectedStyle.imageSrc}
                           alt={styleState.selectedStyle.name}
                           className="w-full h-full object-cover rounded"
+                          key={styleState.selectedStyle.id}
                         />
                         <div className="absolute bottom-1 left-1 bg-black/70 rounded p-0.5">
                           <Palette className="h-3.5 w-3.5 text-white" />
@@ -322,7 +326,7 @@ export default function Chat() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadState.isUploading || uploadImageMutation.isPending}
               >
-                <Image className="h-3.5 w-3.5" />
+                <ImageIcon className="h-3.5 w-3.5" />
                 <span className="text-xs">Image</span>
               </Button>
               <Button
