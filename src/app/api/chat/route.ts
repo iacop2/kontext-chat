@@ -36,7 +36,7 @@ const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const FETCH_TIMEOUT = parseInt(process.env.FETCH_TIMEOUT || '30000');
 
 // Test Mode Configuration
-const TEST_MODE = process.env.TEST_MODE === 'true' || true;
+const TEST_MODE = process.env.TEST_MODE === 'true';
 const TEST_DELAY = parseInt(process.env.TEST_DELAY || '5000');
 const TEST_IMAGE_URL = process.env.TEST_IMAGE_URL || 'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
 

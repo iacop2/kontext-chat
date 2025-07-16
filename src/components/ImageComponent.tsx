@@ -12,9 +12,10 @@ type ImageComponentProps = {
   showControls?: boolean;
   showDownload?: boolean;
   onUseAsInput?: () => void;
+  showLoadingSpinner?: boolean;
 };
 
-export function ImageComponent({ src, alt, className = '', showControls = true, showDownload = true, onUseAsInput }: ImageComponentProps) {
+export function ImageComponent({ src, alt, className = '', showControls = true, showDownload = true, onUseAsInput, showLoadingSpinner = false }: ImageComponentProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
@@ -103,6 +104,12 @@ export function ImageComponent({ src, alt, className = '', showControls = true, 
                   </Tooltip>
                 )}
               </div>
+            </div>
+          )}
+
+          {showLoadingSpinner && (
+            <div className="absolute bottom-2 right-2">
+              <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
             </div>
           )}
         </div>
