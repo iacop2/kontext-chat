@@ -5,7 +5,6 @@ import { Palette, Sparkles, Eye, Edit3 } from 'lucide-react';
 import image_1 from '../../public/images/community/2.jpg';
 import image_2 from '../../public/images/community/4.jpg';
 import image_3 from '../../public/images/community/3.jpg';
-import { StaticImageData } from 'next/image';
 
 interface ExampleCard {
   id: string;

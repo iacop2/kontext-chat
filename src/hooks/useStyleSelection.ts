@@ -1,20 +1,17 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { StyleModel } from '@/lib/models';
-
-type StyleSelectionState = {
-  selectedStyle?: StyleModel;
-};
+import { StyleState } from '@/types/chat';
 
 export function useStyleSelection() {
-  const [styleState, setStyleState] = useState<StyleSelectionState>({});
+  const [styleState, setStyleState] = useState<StyleState>({});
 
-  const handleStyleSelect = (style: StyleModel) => {
+  const handleStyleSelect = useCallback((style: StyleModel) => {
     setStyleState({ selectedStyle: style });
-  };
+  }, []);
 
-  const handleStyleRemove = () => {
+  const handleStyleRemove = useCallback(() => {
     setStyleState({});
-  };
+  }, []);
 
   return {
     styleState,

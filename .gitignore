@@ -3,6 +3,7 @@
 node_modules
 .next
 .vercel
+.DS_Store
+tsconfig.tsbuildinfo
 CLAUDE.md
 .claude
-.DS_Store

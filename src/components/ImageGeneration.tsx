@@ -3,16 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { ImageComponent } from './ImageComponent';
-
-type ImageGenerationData = {
-  status: string;
-  type: 'create' | 'edit';
-  streamingImage?: string;
-  finalImage?: string;
-  error?: string;
-  progress?: number;
-  queuePosition?: number;
-};
+import { ImageGenerationData } from '@/types/chat';
 
 type ImageGenerationProps = {
   data: ImageGenerationData;

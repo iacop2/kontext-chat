@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { Download, ArrowLeftRight } from 'lucide-react';
+import { Download, ArrowLeftRight, Loader2 } from 'lucide-react';
 
 type ImageComponentProps = {
   src: string;
@@ -22,6 +22,9 @@ export function ImageComponent({ src, alt, className = '', showControls = true, 
     e.stopPropagation();
     try {
       const response = await fetch(src);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -33,6 +36,8 @@ export function ImageComponent({ src, alt, className = '', showControls = true, 
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download failed:', error);
+      // Show user-friendly error message
+      alert('Failed to download image. Please try again.');
     }
   };
 

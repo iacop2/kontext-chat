@@ -3,9 +3,10 @@ import { Badge } from '@/components/ui/badge';
 import { Image as ImageIcon } from 'lucide-react';
 import { ImageGeneration } from './ImageGeneration';
 import { ImageComponent } from './ImageComponent';
+import { MessagePartData } from '@/types/chat';
 
 type MessagePartProps = {
-  part: any;
+  part: MessagePartData;
   messageId: string;
   partIndex: number;
   onUseAsInput?: (imageUrl: string) => void;
@@ -70,7 +71,7 @@ export function MessagePart({ part, messageId, partIndex, onUseAsInput }: Messag
     case 'data-image-description':
       return (
         <div key={key} className="prose prose-sm max-w-none">
-          {part.data?.description || ''}
+          {part.data.description}
         </div>
       );
 

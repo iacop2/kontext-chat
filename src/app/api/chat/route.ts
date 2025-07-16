@@ -9,7 +9,36 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { createFalClient } from '@fal-ai/client';
-const TEST_MODE = false;
+
+// Types
+interface StreamWriter {
+  write: (data: any) => void;
+  merge: (stream: any) => void;
+}
+
+interface ImageGenerationData {
+  status: string;
+  prompt: string;
+  type: 'create' | 'edit';
+  streamingImage?: string;
+  finalImage?: string;
+  progress?: number;
+}
+
+interface LoraData {
+  name: string;
+  loraUrl: string | undefined;
+  loraTriggerWord: string | undefined;
+}
+
+// Configuration
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const FETCH_TIMEOUT = parseInt(process.env.FETCH_TIMEOUT || '30000');
+
+// Test Mode Configuration
+const TEST_MODE = process.env.TEST_MODE === 'true' || true;
+const TEST_DELAY = parseInt(process.env.TEST_DELAY || '5000');
+const TEST_IMAGE_URL = process.env.TEST_IMAGE_URL || 'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,
@@ -44,11 +73,11 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
         userPrompt,
         imageAttached: fileParts.length > 0 ? fileParts.map(part => part.url) : null,
         loraSelected: loraParts.length > 0 ? loraParts.map(part => {
-          const data = (part as any).data;
+          const data = (part as any).data as LoraData;
           return {
             name: data.name,
-            loraUrl: data.loraUrl || null,
-            loraTriggerWord: data.triggerWord || null
+            loraUrl: data.loraUrl || undefined,
+            loraTriggerWord: data.loraTriggerWord || undefined
           };
         }) : null
       };
@@ -68,19 +97,50 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
 }
 
 async function uploadImageToStorage(imageUrl: string): Promise<string> {
-  const imageResponse = await fetch(imageUrl);
-  const imageBlob = await imageResponse.blob();
-  return await fal.storage.upload(imageBlob);
+  // Validate URL format
+  try {
+    new URL(imageUrl);
+  } catch {
+    throw new Error(`Invalid image URL format: ${imageUrl}`);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  try {
+    const imageResponse = await fetch(imageUrl, {
+      signal: controller.signal,
+    });
+
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+
+    const contentType = imageResponse.headers.get('content-type');
+    if (!contentType?.startsWith('image/')) {
+      throw new Error(`Invalid content type: ${contentType}. Expected image.`);
+    }
+
+    const imageBlob = await imageResponse.blob();
+    return await fal.storage.upload(imageBlob);
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Image fetch timeout after ${FETCH_TIMEOUT}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
-function writeError(writer: any, errorMessage: string): void {
+function writeError(writer: StreamWriter, errorMessage: string): void {
   writer.write({
     type: 'error',
     errorText: errorMessage
   });
 }
 
-function writeGenerationStatus(writer: any, toolCallId: string, data: any): void {
+function writeGenerationStatus(writer: StreamWriter, toolCallId: string, data: ImageGenerationData): void {
   writer.write({
     type: 'data-image-generation',
     id: toolCallId,
@@ -88,8 +148,46 @@ function writeGenerationStatus(writer: any, toolCallId: string, data: any): void
   });
 }
 
+async function processTestModeGeneration(
+  writer: StreamWriter,
+  toolCallId: string,
+  prompt: string,
+  type: 'create' | 'edit'
+): Promise<{ prompt: string; imageUrl: string }> {
+  // Simulate progress with delays
+  await new Promise(resolve => setTimeout(resolve, TEST_DELAY));
+  writeGenerationStatus(writer, toolCallId, {
+    status: 'generating',
+    streamingImage: TEST_IMAGE_URL,
+    prompt,
+    type
+  });
+
+  await new Promise(resolve => setTimeout(resolve, TEST_DELAY));
+  
+  // Write uploading status
+  writeGenerationStatus(writer, toolCallId, {
+    status: 'uploading',
+    streamingImage: TEST_IMAGE_URL,
+    prompt,
+    type
+  });
+
+  // Actually upload the test image to permanent storage
+  const uploadResult = await uploadImageToStorage(TEST_IMAGE_URL);
+  
+  writeGenerationStatus(writer, toolCallId, {
+    status: 'completed',
+    finalImage: uploadResult,
+    prompt,
+    type
+  });
+
+  return { prompt, imageUrl: uploadResult };
+}
+
 async function processImageGeneration(
-  writer: any,
+  writer: StreamWriter,
   toolCallId: string,
   prompt: string,
   type: 'create' | 'edit',
@@ -106,27 +204,7 @@ async function processImageGeneration(
     });
 
     if (TEST_MODE) {
-      // Mock generation process for test mode
-      const mockImageUrl = 'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
-      
-      // Simulate progress with delays
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      writeGenerationStatus(writer, toolCallId, {
-        status: 'generating',
-        streamingImage: mockImageUrl,
-        prompt,
-        type
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      writeGenerationStatus(writer, toolCallId, {
-        status: 'completed',
-        finalImage: mockImageUrl,
-        prompt,
-        type
-      });
-
-      return { prompt, imageUrl: mockImageUrl };
+      return await processTestModeGeneration(writer, toolCallId, prompt, type);
     }
 
     // Prepare stream input
@@ -189,7 +267,7 @@ async function processImageGeneration(
     // Write uploading status while keeping last streaming image visible
     writeGenerationStatus(writer, toolCallId, {
       status: 'uploading',
-      streamingImage: lastStreamingImage,
+      streamingImage: lastStreamingImage || undefined,
       prompt,
       type
     });
@@ -207,7 +285,18 @@ async function processImageGeneration(
 
     return { prompt, imageUrl: uploadResult };
   } catch (error: any) {
-    writeError(writer, `Error ${type === 'create' ? 'generating' : 'editing'} image: ${error.message}`);
+    const operation = type === 'create' ? 'generating' : 'editing';
+    const contextMessage = imageUrl ? ` (image: ${imageUrl.substring(0, 50)}...)` : '';
+    const errorMessage = `Error ${operation} image${contextMessage}: ${error.message || 'Unknown error'}`;
+    
+    console.error(`[${operation.toUpperCase()}] ${errorMessage}`, {
+      prompt,
+      imageUrl,
+      loraUrl,
+      error: error.stack || error
+    });
+    
+    writeError(writer, errorMessage);
     throw error;
   }
 }
@@ -223,7 +312,7 @@ export async function POST(req: Request) {
       execute: ({ writer }) => {
         try {
           const result = streamText({
-            model: openai('gpt-4.1-mini'),
+            model: openai(DEFAULT_MODEL),
             messages: modelMessages,
             system: SYSTEM_PROMPT,
             tools: {
@@ -257,7 +346,7 @@ export async function POST(req: Request) {
           }),
           execute: async ({ imageUrl }, { toolCallId }) => {
             const { textStream } = streamText({
-              model: openai('gpt-4.1-mini'),
+              model: openai(DEFAULT_MODEL),
               messages: [
                 {
                   role: 'user',
@@ -289,18 +378,34 @@ export async function POST(req: Request) {
 
           writer.merge(result.toUIMessageStream());
         } catch (error: any) {
-          console.error('Error in streamText execution:', error);
-          writeError(writer, `Error processing request: ${error.message}`);
+          const errorMessage = `Error processing request: ${error.message || 'Unknown error'}`;
+          console.error('[STREAM_TEXT] ' + errorMessage, {
+            error: error.stack || error,
+            messages: messages.length
+          });
+          writeError(writer, errorMessage);
         }
       },
     });
 
     return createUIMessageStreamResponse({ stream });
   } catch (error: any) {
-    console.error('Error in POST handler:', error);
+    const errorMessage = error.message || 'Unknown error occurred';
+    console.error('[POST_HANDLER] Internal server error:', {
+      error: error.stack || error,
+      message: errorMessage
+    });
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error', message: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: 'Internal server error', 
+        message: errorMessage,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
     );
   }
 }

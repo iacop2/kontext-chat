@@ -1,14 +1,6 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { uploadImage } from '@/actions/upload-image';
-
-type UploadState = {
-  isUploading: boolean;
-  uploadedImage?: string;
-  fileName?: string;
-  previewUrl?: string;
-  isExampleImage?: boolean;
-  exampleImageUrl?: string;
-};
+import { UploadState } from '@/types/chat';
 
 export function useFileUpload() {
   const [uploadState, setUploadState] = useState<UploadState>({ isUploading: false });
@@ -28,7 +20,7 @@ export function useFileUpload() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      console.error('Invalid file type:', file.type);
       return;
     }
 
@@ -53,7 +45,7 @@ export function useFileUpload() {
     } catch (error) {
       console.error('Upload failed:', error);
       setUploadState({ isUploading: false });
-      alert('Upload failed. Please try again.');
+      // Error will be handled by the UI layer
     }
   };
 
