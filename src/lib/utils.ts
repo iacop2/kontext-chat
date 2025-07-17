@@ -5,13 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function truncateStringsInObject(obj: any, maxLength = 1000) {
+export function logMessages(name: string, obj: any, maxLength: number = 50) {
+  if (!obj) {
+    console.log(name, '');
+    return;
+  }
+
   const seen = new WeakSet();
 
   function truncate(value: any): any {
     if (typeof value === 'string') {
       return value.length > maxLength
-        ? value.slice(0, maxLength) + '... [truncated]'
+        ? value.slice(0, maxLength) + '...'
         : value;
     } else if (Array.isArray(value)) {
       return value.map(truncate);
@@ -27,5 +32,5 @@ export function truncateStringsInObject(obj: any, maxLength = 1000) {
     return value;
   }
 
-  return truncate(obj);
+  console.log(name, JSON.stringify(truncate(obj), null, 2));
 }

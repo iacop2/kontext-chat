@@ -8,7 +8,7 @@ import { useChatHandlers } from '@/hooks/useChatHandlers';
 import { StyleSelectionDialog } from '@/components/StyleSelectionDialog';
 import { ChatLayout } from '@/components/ChatLayout';
 import { ChatInput } from '@/components/ChatInput';
-import { truncateStringsInObject } from '@/lib/utils';
+import { logMessages } from '@/lib/utils';
 import { getStoredApiKey } from '@/lib/api-key-storage';
 import { DefaultChatTransport } from 'ai';
 
@@ -115,7 +115,7 @@ export default function Chat() {
     },
   });
 
-  console.log("messages", truncateStringsInObject(messages));
+  logMessages("messages", messages);
 
   const handleSendMessage = (message: any) => {
     // Clear rate limit info when sending new message
@@ -163,6 +163,7 @@ export default function Chat() {
         onRemoveStyle={handleStyleRemove}
         onOpenStyleDialog={() => setIsStyleDialogOpen(true)}
         fileInputRef={fileInputRef}
+        textareaRef={textareaRef}
         isSubmitting={isSubmitting}
       />
       <StyleSelectionDialog

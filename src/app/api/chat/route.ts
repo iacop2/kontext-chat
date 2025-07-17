@@ -13,6 +13,7 @@ import { NextRequest } from 'next/server';
 import { checkBotId } from 'botid/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { kv } from '@vercel/kv';
+import { logMessages } from '@/lib/utils';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -20,7 +21,7 @@ export const maxDuration = 30;
 // Create Rate limit
 const ratelimit = new Ratelimit({
   redis: kv,
-  limiter: Ratelimit.fixedWindow(1, '99999d'),
+  limiter: Ratelimit.fixedWindow(4, '99999d'),
 });
 
 // Types
@@ -68,7 +69,35 @@ const INFERENCE_CONFIG = {
   enable_safety_checker: true,
 };
 
-const SYSTEM_PROMPT = "You are a helpful image generation and editing assistant. Generate one image per user request using `editImage` or `createImage`. Prompt Handling: - Keep the user prompt exactly as-is, do not modify it. LoRA Style: - Use the selected LoRA if present; if none is selected, don't use one. - When using LoRA, you must include its trigger word exactly as-is in the loraTriggerWord. - If the user prompt is empty, use: \"Turn the image into the *loraTriggerWord* style.\" Image Editing Rules: - Use the attached image if available. - If no image is attached but one exists earlier in the conversation, use the most recent image (including generated ones). - If only a LoRA is selected and no new image or prompt is provided, apply the LoRA to the latest image. - Only create a new image if the user explicitly asks for it. Parameters: - `createImage` → `imageSize`: [square_hd, square, portrait_4_3 (default), portrait_16_9, landscape_4_3, landscape_16_9] - `editImage` → `resolutionMode`: [match_input (default), 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21] - Use the nearest available value when user specifies a size/aspect ratio. Important: Ignore any random words (e.g., animal names) in image URLs—they do not indicate image content.";
+const SYSTEM_PROMPT = `You are a helpful image generation and editing assistant. Generate one image per user request using \`editImage\` or \`createImage\`. 
+
+Prompt Handling: 
+- Keep the user prompt exactly as-is, do not modify it. 
+
+LoRA Style: 
+- Use the selected LoRA if present; if none is selected, don't use one. 
+- When using LoRA, you must include its trigger word exactly as-is in the loraTriggerWord. 
+- If the user prompt is empty, use: "Turn the image into the *loraTriggerWord* style." 
+
+Image Selection Rules (CRITICAL - Follow this exact priority):
+1. **For the FIRST edit in a conversation:** Use the attached image if available
+2. **For ALL subsequent edits:** ALWAYS use the most recently generated image from the previous tool result (the finalImage URL from the last editImage/createImage call)
+3. **Only create a new image if the user explicitly asks to "create" or "generate" a new image**
+4. **Chain edits together:** Each edit should build upon the previous result, creating a cumulative effect
+
+Image Input Priority (when no previous generation exists):
+- Use attached image if available
+- If no attached image, user must provide one or request a new creation
+
+Parameters: 
+- \`createImage\` → \`imageSize\`: [square_hd, square, portrait_4_3 (default), portrait_16_9, landscape_4_3, landscape_16_9] 
+- \`editImage\` → \`resolutionMode\`: [match_input (default), 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21] 
+- Use the nearest available value when user specifies a size/aspect ratio. 
+
+Important: 
+- Ignore any random words (e.g., animal names) in image URLs—they do not indicate image content
+- Always maintain editing continuity by using the latest generated result as input for the next edit
+- Think of each edit as adding to or modifying the previous result, not starting over`;
 
 
 // Utility functions
@@ -359,8 +388,9 @@ export async function POST(req: NextRequest) {
     }
 
     const processedMessages = processMessagesWithFiles(messages);
+    logMessages("processedMessages", processedMessages, 500);
     const modelMessages = convertToModelMessages(processedMessages);
-
+    logMessages("modelMessages", modelMessages, 500);
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
         try {

@@ -119,9 +119,12 @@ export function useChatHandlers({
       }
     }
 
-    // Focus the textarea after setting the input
+    // Focus the textarea and scroll to it after setting the input
     setTimeout(() => {
-      textareaRef.current?.focus();
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }, TEXTAREA_FOCUS_DELAY);
   }, [setInput, handleRemoveUpload, handleStyleRemove, handleExampleImage, handleStyleSelect, textareaRef]);
 

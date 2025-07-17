@@ -16,6 +16,7 @@ interface ChatInputProps {
   onRemoveStyle: () => void;
   onOpenStyleDialog: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   isSubmitting: boolean;
 }
 
@@ -30,9 +31,11 @@ export function ChatInput({
   onRemoveStyle,
   onOpenStyleDialog,
   fileInputRef,
+  textareaRef: externalTextareaRef,
   isSubmitting
 }: ChatInputProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = externalTextareaRef || internalTextareaRef;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
