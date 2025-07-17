@@ -53,9 +53,11 @@ const TEST_MODE = process.env.TEST_MODE === 'true';
 const TEST_DELAY = parseInt(process.env.TEST_DELAY || '5000');
 const TEST_IMAGE_URL = process.env.TEST_IMAGE_URL || 'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
 
-const fal = createFalClient({
-  credentials: () => process.env.FAL_KEY! as string,
-});
+function createFalClientWithKey(apiKey?: string) {
+  return createFalClient({
+   credentials: apiKey ?? undefined,
+  });
+}
 
 
 // Constants
@@ -107,7 +109,7 @@ function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
   });
 }
 
-async function uploadImageToStorage(imageUrl: string): Promise<string> {
+async function uploadImageToStorage(imageUrl: string, fal: any): Promise<string> {
   // Validate URL format
   try {
     new URL(imageUrl);
@@ -163,7 +165,8 @@ async function processTestModeGeneration(
   writer: StreamWriter,
   toolCallId: string,
   prompt: string,
-  type: 'create' | 'edit'
+  type: 'create' | 'edit',
+  fal: any
 ): Promise<{ prompt: string; imageUrl: string }> {
   // Simulate progress with delays
   await new Promise(resolve => setTimeout(resolve, TEST_DELAY));
@@ -185,7 +188,7 @@ async function processTestModeGeneration(
   });
 
   // Actually upload the test image to permanent storage
-  const uploadResult = await uploadImageToStorage(TEST_IMAGE_URL);
+  const uploadResult = await uploadImageToStorage(TEST_IMAGE_URL, fal);
   
   writeGenerationStatus(writer, toolCallId, {
     status: 'completed',
@@ -202,6 +205,7 @@ async function processImageGeneration(
   toolCallId: string,
   prompt: string,
   type: 'create' | 'edit',
+  fal: any,
   imageUrl?: string,
   imageSize?: string,
   loraUrl?: string
@@ -215,7 +219,7 @@ async function processImageGeneration(
     });
 
     if (TEST_MODE) {
-      return await processTestModeGeneration(writer, toolCallId, prompt, type);
+      return await processTestModeGeneration(writer, toolCallId, prompt, type, fal);
     }
 
     // Prepare stream input
@@ -284,7 +288,7 @@ async function processImageGeneration(
     });
 
     // Upload final image to permanent storage
-    const uploadResult = await uploadImageToStorage(images[0].url);
+    const uploadResult = await uploadImageToStorage(images[0].url, fal);
 
     // Write final result
     writeGenerationStatus(writer, toolCallId, {
@@ -298,6 +302,14 @@ async function processImageGeneration(
   } catch (error: any) {
     const operation = type === 'create' ? 'generating' : 'editing';
     const contextMessage = imageUrl ? ` (image: ${imageUrl.substring(0, 50)}...)` : '';
+    
+    // Check for authentication errors
+    if (error.message?.includes('Unauthorized') || error.message?.includes('Invalid API key') || error.status === 401) {
+      const errorMessage = `Invalid FAL API key. Please check your API key and try again.`;
+      writeError(writer, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
     const errorMessage = `Error ${operation} image${contextMessage}: ${error.message || 'Unknown error'}`;
     
     console.error(`[${operation.toUpperCase()}] ${errorMessage}`, {
@@ -319,24 +331,32 @@ export async function POST(req: NextRequest) {
     return new Response("Access denied", { status: 403 });
   }
 
-  // Check if user has provided their own API key
-  const authHeader = req.headers.get("authorization");
-  const hasCustomApiKey = authHeader && authHeader.length > 0;
-  
-  // Only apply rate limiting if no custom API key is provided
-  if (!hasCustomApiKey) {
-    const ip = req.headers.get("x-forwarded-for") ?? "ip";
-    const { success } = await ratelimit.limit(ip);
-    if (!success) {
-      return new Response(
-        `Free request limit exceeded. Please add your FAL API key to continue without rate limits.`,
-        { status: 429 }
-      );
-    }
-  }
-
   try {
-    const { messages }: { messages: UIMessage[] } = await req.json();
+    const body = await req.json();
+    const { messages, apiKey }: { messages: UIMessage[], apiKey?: string } = body;
+    
+    // Extract custom API key from request body
+    const customApiKey = apiKey?.trim();
+    const hasCustomApiKey = customApiKey && customApiKey.length > 0;
+  
+    let fal;
+    
+    if (hasCustomApiKey) {
+      // If API key provided, create client directly with that key
+      fal = createFalClientWithKey(customApiKey);
+    } else {
+      // If no API key provided, go through rate limiter first
+      const ip = req.headers.get("x-forwarded-for") ?? "ip";
+      const { success } = await ratelimit.limit(ip);
+      if (!success) {
+        return new Response(
+          `Free request limit exceeded. Please add your FAL API key to continue without rate limits.`,
+          { status: 429 }
+        );
+      }
+      // If rate limit passed, use project key
+      fal = createFalClientWithKey(process.env.FAL_KEY!);
+    }
 
     const processedMessages = processMessagesWithFiles(messages);
     const modelMessages = convertToModelMessages(processedMessages);
@@ -357,7 +377,7 @@ export async function POST(req: NextRequest) {
             loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'create', undefined, args.imageSize, args.loraUrl);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'create', fal, undefined, args.imageSize, args.loraUrl);
           },
         }),
         editImage: tool({
@@ -369,7 +389,7 @@ export async function POST(req: NextRequest) {
             loraUrl: z.string().url().optional().describe('Optional LoRA URL for style application'),
           }),
           execute: async (args, { toolCallId }) => {
-            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', args.imageUrl, args.resolutionMode, args.loraUrl);
+            return processImageGeneration(writer, toolCallId, args.prompt, 'edit', fal, args.imageUrl, args.resolutionMode, args.loraUrl);
           },
         }),
         describeImage: tool({

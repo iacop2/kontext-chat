@@ -1,4 +1,5 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { StyleModel, styleModels } from '@/lib/models';
 import Image from 'next/image';
 
@@ -20,6 +21,11 @@ export function StyleSelectionDialog({ open, onOpenChange, onStyleSelect }: Styl
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
         <DialogHeader>
           <DialogTitle>Choose a Style</DialogTitle>
+          <VisuallyHidden>
+            <DialogDescription>
+              Select a style to apply to your image
+            </DialogDescription>
+          </VisuallyHidden>
         </DialogHeader>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 p-2">
           {styleModels.map((style) => (
