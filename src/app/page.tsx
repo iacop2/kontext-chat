@@ -8,7 +8,7 @@ import { useChatHandlers } from '@/hooks/useChatHandlers';
 import { StyleSelectionDialog } from '@/components/StyleSelectionDialog';
 import { ChatLayout } from '@/components/ChatLayout';
 import { ChatInput } from '@/components/ChatInput';
-
+import { truncateStringsInObject } from '@/lib/utils';
 
 
 export default function Chat() {
@@ -30,9 +30,29 @@ export default function Chat() {
     handleStyleRemove,
   } = useStyleSelection();
 
+  const [rateLimitInfo, setRateLimitInfo] = useState<any>(null);
+
   const { messages, sendMessage, status, error, regenerate } = useChat({
     maxSteps: 1,
+    onError: (error) => {
+      // Check if this is a rate limit error
+      if (error.message.includes('Rate limit exceeded')) {
+        setRateLimitInfo({
+          type: 'rate_limit_exceeded',
+          message: error.message,
+          isPermanent: true
+        });
+      }
+    },
   });
+
+  console.log("messages", truncateStringsInObject(messages));
+
+  const handleSendMessage = (message: any) => {
+    // Clear rate limit info when sending new message
+    setRateLimitInfo(null);
+    sendMessage(message);
+  };
 
   const {
     handleSubmit,
@@ -41,7 +61,7 @@ export default function Chat() {
   } = useChatHandlers({
     input,
     setInput,
-    sendMessage,
+    sendMessage: handleSendMessage,
     uploadState,
     styleState,
     handleRemoveUpload,
@@ -57,6 +77,7 @@ export default function Chat() {
     <ChatLayout
       messages={messages}
       error={error}
+      rateLimitInfo={rateLimitInfo}
       onExampleSelect={handleExampleSelect}
       onUseImageAsInput={handleUseImageAsInput}
       onRetry={() => regenerate()}

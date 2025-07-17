@@ -9,6 +9,19 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { createFalClient } from '@fal-ai/client';
+import { NextRequest } from 'next/server';
+import { checkBotId } from 'botid/server';
+import { Ratelimit } from '@upstash/ratelimit';
+import { kv } from '@vercel/kv';
+
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30;
+
+// Create Rate limit
+const ratelimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.fixedWindow(1, '99999d'),
+});
 
 // Types
 interface StreamWriter {
@@ -42,8 +55,8 @@ const TEST_IMAGE_URL = process.env.TEST_IMAGE_URL || 'https://v3.fal.media/files
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,
-  proxyUrl: "/api/fal",
 });
+
 
 // Constants
 const INFERENCE_CONFIG = {
@@ -53,10 +66,8 @@ const INFERENCE_CONFIG = {
   enable_safety_checker: true,
 };
 
-const SYSTEM_PROMPT = 'You are a helpful image generation and editing assistant. Generate exactly ONE image per user request using "createImage" or "editImage". You will always be informed about the current context consisting of attached image and selected LoRA style.\n\nKeep the user prompt exactly as-is, do not modify it in any way.\n\nFor LoRA styles:\n- Always use the LoRA selected by the user if one is currently selected\n- If no LoRA is selected, do not use one\n- CRITICAL: When using a LoRA, you MUST ALWAYS include the LoRA trigger word exactly as-is in the prompt parameter, or the LoRA will not work. When user prompt is empty, include the trigger word like this: "Turn the image into the **triggerWord** style". \n\nFor editing requests:\n- Always use the attached image if present\n- If no image is attached, and no image is indicated by the user, use the most recent image in the chat messages, including generated images.\n If only LoRA is selected, apply the LoRA to the most recent image, including generated images. \n If there is a previous image in chat or context, assume the request is to edit an image instead of creating a new one, generate/create new one only when explicitly asked to do so. \n\nFor imageSize input (createImage), available values are: square_hd, square, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9 with default portrait_4_3. For resolutionMode input (editImage), available values are: match_input, 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21 with default match_input. Always pass default value unless the user specify a size/resolution/aspect ratio, in that case pass the nearest one in the available ones.\n\n IMPORTANT: When processing image URLs, ignore any random text or animal names in the URL path (like "elephant", "zebra", etc.) as these are just random identifiers and do not define the actual content or context of the image.';
+const SYSTEM_PROMPT = "You are a helpful image generation and editing assistant. Generate one image per user request using `editImage` or `createImage`. Prompt Handling: - Keep the user prompt exactly as-is, do not modify it. LoRA Style: - Use the selected LoRA if present; if none is selected, don't use one. - When using LoRA, you must include its trigger word exactly as-is in the loraTriggerWord. - If the user prompt is empty, use: \"Turn the image into the *loraTriggerWord* style.\" Image Editing Rules: - Use the attached image if available. - If no image is attached but one exists earlier in the conversation, use the most recent image (including generated ones). - If only a LoRA is selected and no new image or prompt is provided, apply the LoRA to the latest image. - Only create a new image if the user explicitly asks for it. Parameters: - `createImage` → `imageSize`: [square_hd, square, portrait_4_3 (default), portrait_16_9, landscape_4_3, landscape_16_9] - `editImage` → `resolutionMode`: [match_input (default), 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21] - Use the nearest available value when user specifies a size/aspect ratio. Important: Ignore any random words (e.g., animal names) in image URLs—they do not indicate image content.";
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
 
 // Utility functions
 function processMessagesWithFiles(messages: UIMessage[]): UIMessage[] {
@@ -301,7 +312,29 @@ async function processImageGeneration(
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Check for bot activity first
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return new Response("Access denied", { status: 403 });
+  }
+
+  // Check if user has provided their own API key
+  const authHeader = req.headers.get("authorization");
+  const hasCustomApiKey = authHeader && authHeader.length > 0;
+  
+  // Only apply rate limiting if no custom API key is provided
+  if (!hasCustomApiKey) {
+    const ip = req.headers.get("x-forwarded-for") ?? "ip";
+    const { success } = await ratelimit.limit(ip);
+    if (!success) {
+      return new Response(
+        `Free request limit exceeded. Please add your FAL API key to continue without rate limits.`,
+        { status: 429 }
+      );
+    }
+  }
+
   try {
     const { messages }: { messages: UIMessage[] } = await req.json();
 

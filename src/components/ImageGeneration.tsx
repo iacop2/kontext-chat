@@ -67,9 +67,9 @@ export function ImageGeneration({ data, onUseAsInput }: ImageGenerationProps) {
             <ImageComponent
               src={finalImage || streamingImage!}
               alt={status === 'completed' ? "Final generated image" : "Streaming generation"}
-              showDownload={status === 'completed' || status === 'uploading'}
+              showDownload={status === 'completed'}
               onUseAsInput={status === 'completed' && finalImage ? () => onUseAsInput?.(finalImage) : undefined}
-              showLoadingSpinner={status === 'generating'}
+              showLoadingSpinner={status === 'generating' || status === 'uploading'}
             />
           </div>
         ) : null}

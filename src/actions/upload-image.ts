@@ -4,7 +4,6 @@ import { createFalClient } from "@fal-ai/client";
 
 const fal = createFalClient({
   credentials: () => process.env.FAL_KEY! as string,
-  proxyUrl: "/api/fal",
 });
 
 export async function uploadImage(imageUrl: string) {
