@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 const title = 'Kontext Chat - Edit Any Image By Chatting With AI';
 const description = 'Chat with AI to create new images, edit existing ones, apply artistic styles, or ask questions about your images.';
+const ogImage = '/images/og-image.jpg';
 export const metadata: Metadata = {
 	title: {
 		default: title,
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
 		siteName: title,
 		images: [
 			{
-				url: '/og-image.jpg',
+				url: ogImage,
 				alt: title,
 				type: 'image/jpeg',
 			},
@@ -57,7 +58,7 @@ export const metadata: Metadata = {
 		description: description,
 		images: [
 			{
-				url: '/og-image.jpg',
+				url: ogImage,
 				alt: title,
 			},
 		],
