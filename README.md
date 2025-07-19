@@ -42,14 +42,6 @@ Interactive chat application for creating and editing images using FAL AI's Flux
   - Example images and prompts to get started quickly
   - Style selection dialog with visual previews
 
-## 📋 Prerequisites
-
-- Node.js 18+
-- pnpm
-- FAL AI API key
-- OpenAI API key
-- Upstash Redis instance (optional, for rate limiting)
-
 ## 🏗️ Architecture
 
 ```mermaid
@@ -157,6 +149,14 @@ graph TB
     class RateLimit,BYOK,Validation security
     class CreateImage,EditImage,DescribeImage tools
 ```
+
+## 📋 Prerequisites
+
+- Node.js 18+
+- pnpm
+- FAL AI API key
+- OpenAI API key
+- Upstash Redis instance (optional, for rate limiting)
 
 ## 🚀 Installation
 
