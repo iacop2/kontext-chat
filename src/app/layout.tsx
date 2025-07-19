@@ -4,24 +4,26 @@ import { focal } from '@/lib/fonts';
 import { BotIdClient } from 'botid/client';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
-const title = 'kontext chat';
-const description = 'Create and edit images with a chat interface.';
+const title = 'Kontext Chat - Edit Any Image By Chatting With AI';
+const description = 'Chat with AI to create new images, edit existing ones, apply artistic styles, or ask questions about your images.';
 export const metadata: Metadata = {
 	title: {
 		default: title,
-		template: '%s | kontext chat',
+		template: '%s | Kontext Chat',
 	},
 	description: description,
 	keywords: [
-		'AI style transfer',
-		'image transformation',
-		'flux model',
+		'AI image generation',
+		'AI image editing',
+		'Flux Kontext',
 		'LoRA',
-		'AI art',
-		'photo styling',
-		'artificial intelligence',
-		'machine learning',
-		'image generation',
+		'FAL AI',
+		'AI chatbot',
+		'image style transfer',
+		'AI art creation',
+		'real-time streaming',
+		'OpenAI GPT',
+		'image transformation',
 	],
 	formatDetection: {
 		email: false,
@@ -89,7 +91,7 @@ export default function RootLayout({
 				<BotIdClient
 					protect={[
 						{
-							path: '/api/fal',
+							path: '/api/chat',
 							method: 'POST',
 						},
 					]}

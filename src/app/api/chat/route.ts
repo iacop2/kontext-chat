@@ -46,14 +46,12 @@ interface LoraData {
 }
 
 // Configuration
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const FETCH_TIMEOUT = parseInt(process.env.FETCH_TIMEOUT || '30000');
+const DEFAULT_MODEL = 'gpt-4.1-mini';
 
 // Test Mode Configuration
 const TEST_MODE = process.env.TEST_MODE === 'true';
-const TEST_DELAY = parseInt(process.env.TEST_DELAY || '5000');
+const TEST_DELAY = 5000;
 const TEST_IMAGE_URL =
-	process.env.TEST_IMAGE_URL ||
 	'https://v3.fal.media/files/elephant/00rs5Nhmp2JZ0WSnGNdUM_1752483234655.jpeg';
 
 function createFalClientWithKey(apiKey?: string) {
@@ -154,7 +152,8 @@ async function uploadImageToStorage(
 	}
 
 	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+	const timeout = 30000;
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
 
 	try {
 		const imageResponse = await fetch(imageUrl, {
@@ -176,7 +175,7 @@ async function uploadImageToStorage(
 		return await fal.storage.upload(imageBlob);
 	} catch (error: any) {
 		if (error.name === 'AbortError') {
-			throw new Error(`Image fetch timeout after ${FETCH_TIMEOUT}ms`);
+			throw new Error(`Image fetch timeout after ${timeout}ms`);
 		}
 		throw error;
 	} finally {
