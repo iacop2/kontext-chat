@@ -69,7 +69,7 @@ graph TB
     %% State Management
     subgraph StateHooks["🔄 State Management (React Hooks)"]
         ChatHandlers["useChatHandlers<br/>Message Submission"]
-        FileUpload["useFileUpload<br/>Drag & Drop"]
+        FileUpload["useFileUpload<br/>Image Upload"]
         StyleSelection["useStyleSelection<br/>LoRA Selection"]
         ApiKeyStorage["api-key-storage<br/>Local Storage"]
 
@@ -92,7 +92,7 @@ graph TB
     %% AI Tools
     subgraph AITools["⚡ AI Tools"]
         CreateImage["🎨 createImage<br/>Generate New Images"]
-        EditImage["✏️ editImage<br/>Style Transfer"]
+        EditImage["✏️ editImage<br/>Edit Existing Images"]
         DescribeImage["👁️ describeImage<br/>Image Analysis"]
 
         Tools --> CreateImage
@@ -102,13 +102,15 @@ graph TB
 
     %% External Services
     subgraph External["🌐 External Services"]
-        FAL["🎭 FAL AI<br/>Flux Kontext LoRA"]
+        FAL["🎭 FAL AI<br/>Flux Kontext Dev (with LoRA support)"]
+        Storage["💾 FAL Storage<br/>Image URLs"]
         OpenAI["🧠 OpenAI GPT<br/>Chat Model"]
         Redis["⚡ Upstash Redis<br/>Rate Limiting"]
         BotID["🛡️ BotID<br/>Bot Protection"]
 
         CreateImage --> FAL
         EditImage --> FAL
+        FAL --> Storage
         DescribeImage --> OpenAI
         StreamText --> OpenAI
         ChatRoute --> Redis
@@ -118,17 +120,14 @@ graph TB
     %% Style System
     subgraph Styles["🎨 Style System"]
         Models["📋 models.ts<br/>23+ Predefined Styles"]
-        CustomLora["🔧 Custom LoRA URLs<br/>Advanced Users"]
 
         StyleSelection --> Models
-        StyleSelection --> CustomLora
         Models --> FAL
-        CustomLora --> FAL
     end
 
     %% Security & Rate Limiting
     subgraph Security["🔒 Security Layer"]
-        RateLimit["⏱️ Rate Limiting<br/>4 requests/day"]
+        RateLimit["⏱️ Rate Limiting for free users"]
         BYOK["🔑 Bring Your Own Key<br/>Unlimited Usage"]
         Validation["✅ Input Validation<br/>Zod Schemas"]
 
@@ -141,17 +140,20 @@ graph TB
     Frontend -.->|User Input| ChatAPI
     ChatAPI -.->|Streaming Response| Frontend
     StateHooks -.->|State Updates| Frontend
+    StateHooks -.->|Upload & Style Data| ChatAPI
+    ApiKeyStorage -.->|API Key| ChatAPI
+    Storage -.->|Image URLs| Frontend
 
-    %% Message Flow
-    classDef frontend fill:#e1f5fe
-    classDef api fill:#f3e5f5
-    classDef external fill:#e8f5e8
-    classDef security fill:#fff3e0
-    classDef tools fill:#fce4ec
+    %% Styling
+    classDef frontend fill:#1e3a8a,stroke:#1e40af,stroke-width:2px,color:#ffffff
+    classDef api fill:#7c2d12,stroke:#ea580c,stroke-width:2px,color:#ffffff
+    classDef external fill:#166534,stroke:#16a34a,stroke-width:2px,color:#ffffff
+    classDef security fill:#92400e,stroke:#d97706,stroke-width:2px,color:#ffffff
+    classDef tools fill:#7c2d56,stroke:#db2777,stroke-width:2px,color:#ffffff
 
     class Page,ChatLayout,ChatInput,StyleDialog frontend
     class ChatRoute,StreamText,Tools api
-    class FAL,OpenAI,Redis,BotID external
+    class FAL,Storage,OpenAI,Redis,BotID external
     class RateLimit,BYOK,Validation security
     class CreateImage,EditImage,DescribeImage tools
 ```
