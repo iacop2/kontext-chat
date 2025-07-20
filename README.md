@@ -193,6 +193,10 @@ graph TB
 
 **Test Mode**: Set `TEST_MODE=true` in your environment to use mock images and avoid API costs during development.
 
+## 🙏 Acknowledgements
+
+ This project is inspired by [Flux Kontext Demo](https://github.com/fal-ai-community/fal-flux-kontext-demo)
+
 ## 📄 License
 
 This project is licensed under the MIT License.
