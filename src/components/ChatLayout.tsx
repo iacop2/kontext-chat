@@ -41,7 +41,7 @@ export function ChatLayout({
 	}, [messages]);
 
 	return (
-		<div className="flex h-screen flex-col bg-background">
+		<div className="flex min-h-screen flex-col bg-background pb-6">
 			<ChatHeader />
 
 			<div className="flex flex-1 flex-col">

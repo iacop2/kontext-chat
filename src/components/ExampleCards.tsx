@@ -77,8 +77,8 @@ interface ExampleCardsProps {
 
 export function ExampleCards({ onExampleSelect }: ExampleCardsProps) {
 	return (
-		<div className="mx-auto w-full max-w-3xl p-6">
-			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+		<div className="mx-auto w-full max-w-3xl sm:p-6">
+			<div className="grid grid-cols-2 gap-2 sm:gap-4">
 				{examples.map((example) => (
 					<Card
 						key={example.id}
@@ -94,7 +94,7 @@ export function ExampleCards({ onExampleSelect }: ExampleCardsProps) {
 						<CardContent className="p-6">
 							<div className="flex items-start space-x-4">
 								<div
-									className={`flex-shrink-0 rounded bg-primary p-3 text-primary-foreground`}
+									className={`flex-shrink-0 rounded bg-primary p-3 text-primary-foreground hidden sm:block`}
 								>
 									{example.icon}
 								</div>
@@ -105,7 +105,7 @@ export function ExampleCards({ onExampleSelect }: ExampleCardsProps) {
 									<p className="text-content-lighter mb-3 mt-1 text-sm">
 										{example.description}
 									</p>
-									<div className="bg-surface-secondary border-stroke-base rounded-md border p-3">
+									<div className="bg-surface-secondary border-stroke-base rounded-md border p-3 hidden sm:block">
 										<p className="text-content-lighter line-clamp-2 text-xs italic">
 											"{example.prompt}"
 										</p>
