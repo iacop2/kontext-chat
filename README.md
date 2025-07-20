@@ -4,7 +4,7 @@ Interactive chat application for creating and editing images using FAL AI's Flux
 
 ## 📽️ Demo
 
-https://github.com/user-attachments/assets/6415a2aa-a6da-460e-84f5-aa7f6918e81f
+https://github.com/user-attachments/assets/85c95a56-0f62-4e8e-9c11-f13b72b1187a
 
 ## 🛠️ Tech Stack
 
