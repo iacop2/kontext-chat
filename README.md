@@ -2,6 +2,10 @@
 
 Interactive chat application for creating and editing images using FAL AI's Flux Kontext Dev with LoRA support and real-time streaming. Chat with AI to create new images, edit existing ones, apply artistic styles, or get detailed image descriptions.
 
+## 📽️ Demo
+
+https://github.com/user-attachments/assets/6415a2aa-a6da-460e-84f5-aa7f6918e81f
+
 ## 🛠️ Tech Stack
 
 - **Frontend:** React, Next.js 15 (App Router), TypeScript
